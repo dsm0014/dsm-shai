@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host prep: enable systemd in WSL and check %UserProfile%\.wslconfig. Idempotent. Run with sudo.
+# Host prep: enable systemd in WSL and check the Windows profile's .wslconfig (/mnt/c/Users/<you>/.wslconfig). Idempotent. Run with sudo.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 need_root
 
@@ -25,7 +25,7 @@ if command -v cmd.exe >/dev/null 2>&1; then
 fi
 
 if [ -z "$win_profile" ] || [ ! -d "$win_profile" ]; then
-  log "WARNING: cannot locate the Windows profile; copy windows/wslconfig.example to %UserProfile%\\.wslconfig manually"
+  log "WARNING: cannot locate the Windows profile; copy windows/wslconfig.example to /mnt/c/Users/<you>/.wslconfig manually"
 else
   wslconfig="$win_profile/.wslconfig"
   if [ ! -f "$wslconfig" ]; then

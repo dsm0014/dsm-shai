@@ -1,5 +1,5 @@
-# Copy to %UserProfile%\.wslconfig on Windows (scripts/00-wsl-host.sh does this if the file is absent),
-# then run `wsl --shutdown` from Windows and restart WSL.
+# From WSL: cp windows/wslconfig.example /mnt/c/Users/<you>/.wslconfig (scripts/00-wsl-host.sh does this if the file is absent;
+# ~/.wslconfig is the WSL home and is NOT read). Then run `wsl.exe --shutdown` and restart WSL.
 [wsl2]
 # 24GB of the 32GB host; leaves ~8GB for Windows. WSL2 defaults to ~15GB.
 memory=24GB
