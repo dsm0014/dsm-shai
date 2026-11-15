@@ -10,3 +10,4 @@
 | 06 | [Observability](./06-observability.md) | TODO |
 | 07 | [Secrets Management and Backup/Restore](./07-secrets-backup.md) | TODO |
 | 08 | [Istio Service Mesh](./08-istio-service-mesh.md) | TODO |
+| 09 | [LiteLLM Gateway](./09-litellm-gateway.md) | TODO |
