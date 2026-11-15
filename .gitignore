@@ -1,0 +1,6 @@
+.env
+*.key
+*.agekey
+secrets.yaml
+*.dec.yaml
+.DS_Store
