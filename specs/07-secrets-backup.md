@@ -12,7 +12,8 @@ Define how secrets are stored in git and how irreplaceable cluster state is back
 - The age private key lives outside the repo (e.g. `~/.config/sops/age/keys.txt`) and is never committed. The user backs it up separately, and the docs say so explicitly.
 - The existing `.gitignore` entries (`.env`, `*.key`, `*.agekey`, `secrets.yaml`, `*.dec.yaml`) stay in force. Encrypted files use a distinct name (e.g. `*.sops.yaml`) so they are not ignored.
 - A documented workflow covers generating the key, encrypting, editing (`sops <file>`), decrypting, and applying, plus rotating the key and re-encrypting.
-- `scripts/apply-secrets.sh` decrypts with `sops -d` and pipes the output straight into `kubectl apply -f -`. It never writes plaintext to disk, fails closed if the key is missing, and does not echo secret values.
+- Delivery is by Flux (spec 10): a Kustomization with `decryption.provider: sops` and a `sops-age` Secret in `flux-system` decrypts and applies encrypted manifests, so the normal path is a commit and encrypted manifests are never applied with `kubectl`. The repo is public, so the ciphertext is world-readable and the age key is the sole protection (rotate on exposure, scan for plaintext before every commit, per spec 10).
+- `scripts/apply-secrets.sh` is kept as a break-glass tool for use before Flux is bootstrapped (and to seed `sops-age`). It decrypts with `sops -d` and pipes the output straight into `kubectl apply -f -`. It never writes plaintext to disk, fails closed if the key is missing, and does not echo secret values.
 - Consumers: Open WebUI `WEBUI_SECRET_KEY` (spec 05), the Grafana admin credential (spec 06), and the LiteLLM master key, per-consumer virtual keys (`hermes`, `openviking`, `open-webui`) and Postgres password (spec 09). Ollama uses no secrets (spec 02); Hermes, OpenViking and Open WebUI hold only their own LiteLLM virtual key.
 
 **Backup scope and destination**
@@ -23,6 +24,7 @@ Define how secrets are stored in git and how irreplaceable cluster state is back
   - Grafana data (spec 06)
   - LiteLLM Postgres (spec 09), captured with `pg_dump` rather than a file copy
   - Istio configuration and the istiod root CA secret in `istio-system` (spec 08)
+  - The age private key (offline) and the `sops-age` Secret (spec 10). Cluster desired state itself lives in git, so a rebuild is k3s, then restore the age key, then `scripts/bootstrap-flux.sh`, then restore PVC data.
   - A k3s datastore snapshot (etcd/SQLite) taken via `k3s etcd-snapshot save` or a consistent copy of the SQLite state.
 - Out of scope: Ollama model weights (re-pullable), which are explicitly excluded.
 - The destination is outside the WSL virtual disk, either a Windows-side folder (e.g. `/mnt/c/Users/<user>/Backups/dsm-shai`) or an external drive. The path is configurable.

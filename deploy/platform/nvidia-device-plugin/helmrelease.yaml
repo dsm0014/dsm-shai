@@ -1,0 +1,32 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: nvidia-device-plugin
+  namespace: nvidia-device-plugin
+spec:
+  interval: 1h
+  timeout: 5m
+  chart:
+    spec:
+      chart: nvidia-device-plugin
+      version: 0.20.1 # keep in sync with scripts/versions.env
+      sourceRef:
+        kind: HelmRepository
+        name: nvidia-device-plugin
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    runtimeClassName: nvidia
+    # The chart's default affinity requires NFD/GFD node labels, which this cluster does not run
+    # (and a WSL2 GPU is not a PCI device), so the pod would never schedule.
+    affinity: null
+    nfd:
+      enabled: false
+    gfd:
+      enabled: false

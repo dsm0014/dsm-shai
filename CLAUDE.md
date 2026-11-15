@@ -17,6 +17,7 @@
 - Agent context needs 32k-64k tokens; KV cache counts against the VRAM budget.
 - Everything runs locally; no cloud model providers.
 - Istio (ambient mode) provides mTLS, authorization, the single ingress gateway and hostname-level egress control (spec 08). Traefik is disabled.
+- Flux (spec 10) is the delivery mechanism for everything in-cluster: ordered `dependsOn` rollout, in-cluster SOPS decryption, drift correction. The repo is public on GitHub, so never commit plaintext secrets or personal data; ciphertext only, scanned before commit.
 - LiteLLM (free tier) is the only caller of Ollama and the routing gateway for models and MCP/browser tools (spec 09). Consumers use per-consumer virtual keys.
 
 ## Conventions

@@ -1,0 +1,28 @@
+# prune: disabled keeps Flux from deleting a namespace (and its PVCs) if a manifest is ever removed.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ollama
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openviking
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hermes
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia-device-plugin
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

@@ -1,0 +1,9 @@
+# k3s also creates this RuntimeClass when it detects nvidia-container-runtime; the handler is identical,
+# so declaring it here keeps the platform stage self-describing without a conflict.
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+handler: nvidia
