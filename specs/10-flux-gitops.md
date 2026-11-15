@@ -27,13 +27,15 @@ Make the git repo the single source of truth for cluster state by running Flux o
 **Ordered rollout (`dependsOn`)**
 - `dependsOn` only links resources of the same kind (Kustomization to Kustomization, HelmRelease to HelmRelease), so a Kustomization that must wait on a HelmRelease uses `wait: true` or `healthChecks` on the Kustomization that deploys it. The spec 08 rollout order is encoded as dependencies between Kustomizations and HelmReleases, each with `wait: true` or health checks, a `timeout` and `retryInterval`:
   1. `platform`: namespaces, `RuntimeClass nvidia`, the NVIDIA device plugin, storage classes (spec 01).
-  2. `istio`: istio-base, then istio-cni, istiod, ztunnel, and the ingress gateway (spec 08). Each depends on the one before. CRD-bearing charts use `install.crds` and `upgrade.crds: CreateReplace`.
-  3. `data`: Postgres for LiteLLM, then the secrets Kustomization (decryption).
-  4. `inference`: Ollama and its model-pull job (spec 02).
-  5. `gateway`: LiteLLM (spec 09), then the browser MCP pod.
-  6. `apps`: OpenViking (spec 03), Hermes (spec 04), Open WebUI (spec 05), and optional SearXNG.
-  7. `observability`: Prometheus, Grafana, DCGM exporter (spec 06).
-  8. `mesh-policy`: ALLOW policies, default-deny, STRICT mTLS and `REGISTRY_ONLY` egress, last and each gated on readiness of the services it protects.
+  2. `data`: the secrets Kustomization (decryption) first, then Postgres for LiteLLM.
+  3. `monitoring`: kube-prometheus-stack (spec 06), which installs the Prometheus Operator CRDs, Prometheus and Grafana. Gated on `data` so the Grafana admin Secret is decrypted.
+  4. `istio`: istio-base, then istio-cni, istiod, ztunnel, and the ingress gateway (spec 08). Each depends on the one before. CRD-bearing charts use `install.crds` and `upgrade.crds: CreateReplace`.
+  5. `inference`: Ollama and its model-pull job (spec 02).
+  6. `gateway`: LiteLLM (spec 09), then the browser MCP pod.
+  7. `apps`: OpenViking (spec 03), Hermes (spec 04), Open WebUI (spec 05), and optional SearXNG.
+  8. `observability`: DCGM exporter and the Grafana route (spec 06).
+  9. `mesh-policy`: ALLOW policies, default-deny, STRICT mTLS and `REGISTRY_ONLY` egress, last and each gated on readiness of the services it protects.
+- The `monitoring` stage comes before `istio`, `inference` and `gateway` on purpose. The kube-prometheus-stack CRDs (ServiceMonitor, PodMonitor, PrometheusRule) must exist before any stage applies a monitor, so those stages `dependsOn` `monitoring`.
 - The mTLS PERMISSIVE-then-STRICT sequence from spec 08 is implemented as commits (or a suspended Kustomization that is resumed), not a manual step.
 - A failed dependency blocks everything after it, and the failure reason is visible with `flux get kustomizations`.
 
