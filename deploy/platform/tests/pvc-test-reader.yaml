@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pvc-test-reader
+  namespace: platform-test
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: reader
+          image: docker.io/library/busybox:1.37.0
+          command: ["sh", "-c", "grep -x persisted /data/marker"]
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: pvc-test}

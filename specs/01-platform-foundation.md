@@ -1,6 +1,6 @@
 # Spec 01 — Platform Foundation
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 ## Purpose
 Prepare the Windows 11 + WSL2 host and a single-node k3s cluster with GPU access, persistent storage, and the repo's `deploy/` layout. This gives the Ollama, OpenViking, and Hermes workloads a place to run.
