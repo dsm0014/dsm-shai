@@ -8,14 +8,15 @@ Make the git repo the single source of truth for cluster state by running Flux o
 ## Behavior
 
 **Components and footprint**
-- Install only the controllers needed: source-controller, kustomize-controller and helm-controller. Notification-controller and the image automation controllers are omitted by default (`flux install --components=...`). The pinned Flux version is recorded in the repo.
+- Install only the controllers needed: source-controller, kustomize-controller and helm-controller. Notification-controller (default-on upstream) and the image automation controllers are omitted via `--components source-controller,kustomize-controller,helm-controller`. Controller memory limits are tightened (for example 256-512Mi, versus the 1Gi upstream limits) with a patch in `clusters/dsm-shai/flux-system/kustomization.yaml`. The pinned Flux version is recorded in the repo.
 - Measured controller memory is recorded and stays within the cluster budget alongside the mesh (spec 08), so Ollama with the 14B model still loads (spec 02).
 - The `flux` CLI is installed by `scripts/` with a pinned version, like the other host tools.
 
 **Bootstrap and source**
 - Bootstrapping is one documented, idempotent script (`scripts/bootstrap-flux.sh`). It installs the controllers, creates the `flux-system` sync and the SOPS decryption Secret, and can be re-run safely.
-- The repo is public on GitHub, so the default Git source is that public repo over HTTPS with no read credential (no deploy key, no token in the cluster). `flux bootstrap github` (or a plain generic Git source) is used, and any write-capable token is needed only on the workstation during bootstrap, is never stored in the cluster and is not committed. A documented alternative for a private fork is an SSH deploy key or an OCI artifact (`flux push artifact` plus `OCIRepository`).
+- The repo is public on GitHub, so the default Git source is that public repo over HTTPS with no read credential (no deploy key, no token in the cluster). Two supported paths: (a) `flux bootstrap github --token-auth` with a PAT on the workstation, after which the `secretRef` is removed from the `GitRepository` and the `flux-system` Secret deleted so the PAT does not stay in the cluster; or (b) no token at all, by committing `flux install --export` output plus a hand-written `GitRepository` and `Kustomization`, applied once. Any write token stays on the workstation and is never committed. A documented alternative for a private fork is an SSH deploy key or an OCI artifact (`flux push artifact` plus `OCIRepository`).
 - Because the repo is public, whatever is committed is world-readable: manifests, hostnames, topology, and the SOPS ciphertext. This is acceptable only with the guardrails in the Secrets section below.
+- `flux-system` stays outside the ambient mesh (controllers talk plain HTTP to the API server and to each other, and default-deny or STRICT mTLS there would break artifact fetches). Flux's own NetworkPolicies from bootstrap stay enabled, and `--cluster-domain` matches the cluster.
 - Under the spec 08 `REGISTRY_ONLY` egress policy, the Git host (or registry) and the Helm/OCI chart hosts are explicitly allow-listed for the `flux-system` namespace and nothing else gains them.
 - Flux manages itself through the `flux-system` Kustomization, so upgrading Flux is a commit that bumps the pinned version.
 
@@ -24,7 +25,7 @@ Make the git repo the single source of truth for cluster state by running Flux o
 - Charts are consumed through `HelmRelease` resources, with chart and image versions pinned (no floating tags), and Kustomize overlays for plain manifests.
 
 **Ordered rollout (`dependsOn`)**
-- The spec 08 rollout order is encoded as dependencies between Kustomizations and HelmReleases, each with `wait: true` or health checks, a `timeout` and `retryInterval`:
+- `dependsOn` only links resources of the same kind (Kustomization to Kustomization, HelmRelease to HelmRelease), so a Kustomization that must wait on a HelmRelease uses `wait: true` or `healthChecks` on the Kustomization that deploys it. The spec 08 rollout order is encoded as dependencies between Kustomizations and HelmReleases, each with `wait: true` or health checks, a `timeout` and `retryInterval`:
   1. `platform`: namespaces, `RuntimeClass nvidia`, the NVIDIA device plugin, storage classes (spec 01).
   2. `istio`: istio-base, then istio-cni, istiod, ztunnel, and the ingress gateway (spec 08). Each depends on the one before. CRD-bearing charts use `install.crds` and `upgrade.crds: CreateReplace`.
   3. `data`: Postgres for LiteLLM, then the secrets Kustomization (decryption).
@@ -51,7 +52,7 @@ Make the git repo the single source of truth for cluster state by running Flux o
 - Rollback is a `git revert` of the offending commit, and the cluster converges back to the previous state.
 
 **Backup interaction**
-- The spec 07 backup scope adds the `flux-system` Secrets (`sops-age`, deploy key) as needed to rebuild, and the restore doc is rewritten so the rebuild is: install k3s, restore the age key, run `bootstrap-flux.sh`, and restore PVC data.
+- The spec 07 backup scope adds the `sops-age` Secret in `flux-system` (or the offline age key it comes from) as needed to rebuild, and the restore doc is rewritten so the rebuild is: install k3s, restore the age key, run `bootstrap-flux.sh`, and restore PVC data.
 
 ## Acceptance Criteria
 - [ ] Flux is installed from pinned versions with only source, kustomize and helm controllers, and the measured controller memory is recorded and within budget.
