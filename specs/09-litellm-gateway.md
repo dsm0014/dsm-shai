@@ -24,7 +24,7 @@ Deploy the free open-source LiteLLM proxy (no enterprise-licensed features) in i
 
 **MCP gateway and browser routing**
 - Use LiteLLM's built-in MCP gateway to register in-cluster MCP servers, giving Hermes one MCP endpoint with per-key tool allowlists:
-  - OpenViking's MCP endpoint (spec 03), if supported. If it is not, document the gap and the workaround.
+  - OpenViking's MCP endpoint at `http://openviking.openviking.svc:1933/mcp` (spec 03), registered with a bearer token for an OpenViking user key (not the root key), with `allowed_tools` limited to what Hermes needs.
   - A headless Playwright MCP server in its own namespace and pod (`deploy/browser/`).
 - **Assumption (flag for user confirmation):** "model/mcp/browser routing" is interpreted as routing browser automation through an MCP browser tool, not a separate browser-proxy product.
 - The browser pod handles arbitrary web content and is high-risk:
