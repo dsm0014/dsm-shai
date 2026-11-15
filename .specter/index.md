@@ -11,3 +11,4 @@
 | litellm-mcp-gateway | LiteLLM MCP Gateway: Registering Servers and Per-Key Tool Access | Registering MCP servers and restricting tools per virtual key via object_permission | litellm, mcp, browser, spec-09 | litellm/mcp-gateway.md |
 | dcgm-exporter | NVIDIA DCGM Exporter for GPU Metrics | DCGM exporter metrics, Helm chart settings and the WSL2/GeForce caveat with nvidia-smi fallback | dcgm, gpu, prometheus, spec-06 | observability/dcgm-exporter.md |
 | sops-age-kubernetes-secrets | SOPS + age for Git-Committed Kubernetes Secrets | age key lookup, .sops.yaml creation rules, encrypted_regex for Secrets and decrypt/pipe workflows | sops, age, secrets, spec-07 | secrets/sops-age-kubernetes-secrets.md |
+| restic-local-backups | restic: Local Repository Backups, Retention and Restore | restic init/backup/forget/prune/check/restore, password files, exit codes and scheduling guidance | restic, backup, restore, spec-07 | backup/restic-local-backups.md |
