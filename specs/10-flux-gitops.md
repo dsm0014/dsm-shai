@@ -14,7 +14,8 @@ Make the git repo the single source of truth for cluster state by running Flux o
 
 **Bootstrap and source**
 - Bootstrapping is one documented, idempotent script (`scripts/bootstrap-flux.sh`). It installs the controllers, creates the `flux-system` sync and the SOPS decryption Secret, and can be re-run safely.
-- The Git source is configurable. The default is a private remote repo, reached over SSH with a read-only deploy key. A documented alternative is an OCI artifact (`flux push artifact` to an in-cluster or local registry plus an `OCIRepository`), for users who do not want a remote. The repo currently has no remote, so the spec must work with either choice.
+- The repo is public on GitHub, so the default Git source is that public repo over HTTPS with no read credential (no deploy key, no token in the cluster). `flux bootstrap github` (or a plain generic Git source) is used, and any write-capable token is needed only on the workstation during bootstrap, is never stored in the cluster and is not committed. A documented alternative for a private fork is an SSH deploy key or an OCI artifact (`flux push artifact` plus `OCIRepository`).
+- Because the repo is public, whatever is committed is world-readable: manifests, hostnames, topology, and the SOPS ciphertext. This is acceptable only with the guardrails in the Secrets section below.
 - Under the spec 08 `REGISTRY_ONLY` egress policy, the Git host (or registry) and the Helm/OCI chart hosts are explicitly allow-listed for the `flux-system` namespace and nothing else gains them.
 - Flux manages itself through the `flux-system` Kustomization, so upgrading Flux is a commit that bumps the pinned version.
 
@@ -37,6 +38,7 @@ Make the git repo the single source of truth for cluster state by running Flux o
 
 **Secrets (SOPS + age, in-cluster)**
 - Kustomizations that contain secrets set `spec.decryption.provider: sops` with a `secretRef` to a `sops-age` Secret in `flux-system`. The key name ends in `.agekey`.
+- Public-repo guardrails: ciphertext in a public repo is permanent and copyable, so the age key is treated as the sole protection and is rotated (re-encrypt, new `sops-age` Secret) if it is ever exposed or if any plaintext secret was ever committed (history is then considered compromised, rotate the secret values too). A pre-commit hook and a CI check (for example gitleaks plus a check that every `*.sops.yaml` carries a `sops:` block) block plaintext secrets, `.env`, `*.agekey` and kubeconfigs. Personal data (home paths, email, hostnames beyond the placeholder domain) is kept out of committed files.
 - The age private key is created in the cluster by `bootstrap-flux.sh` from the key outside the repo. It is never committed and never echoed. It stays backed up separately (spec 07).
 - Only `data` and `stringData` are encrypted (`encrypted_regex`). Secret values are not injected through patches that would reintroduce plaintext matching the regex.
 - Encrypted manifests are never applied with `kubectl`. Spec 07's `apply-secrets.sh` is reduced to a break-glass tool, and the normal path is a commit.
@@ -54,7 +56,8 @@ Make the git repo the single source of truth for cluster state by running Flux o
 ## Acceptance Criteria
 - [ ] Flux is installed from pinned versions with only source, kustomize and helm controllers, and the measured controller memory is recorded and within budget.
 - [ ] `scripts/bootstrap-flux.sh` takes a fresh k3s cluster to a fully reconciled stack, and re-running it makes no changes.
-- [ ] The Git (or OCI) source authenticates with a read-only credential, and no credential or age private key is committed.
+- [ ] Flux syncs from the public GitHub repo with no credential stored in the cluster, and no token, deploy key or age private key is committed.
+- [ ] The pre-commit and CI secret scanning fails on an injected plaintext Secret and on an unencrypted `*.sops.yaml`, and passes on the clean repo, including a scan of the full git history.
 - [ ] Reconciliation order follows the `dependsOn` chain above, verified by `flux get kustomizations` and `flux get helmreleases` showing each stage ready before the next starts.
 - [ ] Deliberately breaking an upstream stage (for example a bad Istio value) blocks downstream stages and surfaces a clear error.
 - [ ] An encrypted Secret committed to the repo is decrypted and applied by kustomize-controller, and no plaintext secret exists in git, in the working tree, or in Flux's source artifact.
