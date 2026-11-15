@@ -8,6 +8,7 @@ Add lightweight monitoring for the k3s stack so GPU/VRAM pressure, WSL memory pr
 ## Behavior
 - Deploy everything into a dedicated k3s namespace `monitoring`, with manifests in `deploy/monitoring/`.
 - **GPU metrics:** run NVIDIA DCGM exporter on the GPU node, using the GPU plugin and runtime from spec 01.
+  - DCGM targets datacenter GPUs on a native Linux driver and nothing upstream documents WSL2 or GeForce support. Profiling fields (`DCGM_FI_PROF_*`) are not expected on an RTX 4080, and the exporter may not initialise at all, so treat the fallback as the likely path and do not block on DCGM.
   - Document which DCGM metrics actually work on WSL2, covering at least framebuffer used/free, GPU utilization, temperature and power. Record the result in `deploy/monitoring/README.md`.
   - If DCGM lacks the needed metrics or fails to start on WSL2, fall back to a small `nvidia-smi`-based exporter (DaemonSet or sidecar). It must expose VRAM used/total, utilization, temperature and per-process VRAM where available.
   - Use stable metric names via recording rules or relabeling, so dashboards and alerts work with either source.
@@ -16,7 +17,7 @@ Add lightweight monitoring for the k3s stack so GPU/VRAM pressure, WSL memory pr
   - Bound retention by both time (e.g. 15d) and size.
   - Store data on a PVC on the WSL ext4 volume, not a `/mnt/c` path.
   - Expose it as ClusterIP only, with no Ingress or hostPort.
-- **Scrape targets:** DCGM or nvidia-smi exporter, node-exporter (WSL memory against the 24GB cap from spec 01), kube-state-metrics, cAdvisor/kubelet for pod CPU and memory, Istio mesh metrics (spec 08), LiteLLM per-key and per-model metrics (spec 09), and Ollama loaded-model data.
+- **Scrape targets:** DCGM or nvidia-smi exporter, node-exporter (WSL memory against the 24GB cap from spec 01), kube-state-metrics, cAdvisor/kubelet for pod CPU and memory, Istio mesh metrics (spec 08), LiteLLM per-key and per-model metrics, including `litellm_mcp_tool_calls_total` per tool, server and key (spec 09), and Ollama loaded-model data.
   - If Ollama has no native `/metrics`, use a lightweight exporter polling `/api/ps` for loaded models and VRAM, plus request activity from LiteLLM metrics (spec 09). Document what is covered.
 - **Grafana:** provision the datasource and dashboards from ConfigMaps (no manual setup), with persistent storage and a non-default admin credential kept in a Secret managed per spec 07.
   - GPU dashboard: VRAM used against the 16GB total, utilization and temperature.

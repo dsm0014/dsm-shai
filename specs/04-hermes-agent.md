@@ -16,7 +16,8 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 **Configuration**
 - `config.yaml` is delivered by a ConfigMap. An init container or entrypoint copies it into `~/.hermes/config.yaml` on each start, so the ConfigMap stays the source of truth.
 - The model provider is a custom OpenAI-compatible endpoint with base URL `http://litellm.litellm.svc:4000/v1` and model alias `chat` (qwen3:14b). Authentication uses the `hermes` LiteLLM virtual key (spec 09), delivered as a SOPS-managed Secret (spec 07).
-- The Hermes context length is set to 32768, matching `OLLAMA_CONTEXT_LENGTH` from spec 02. The ConfigMap comments name that coupling, so a change to one is made to the other.
+- The Hermes `model.context_length` is pinned to 32768, matching `OLLAMA_CONTEXT_LENGTH` from spec 02. Pinning is required, because auto-detection against Ollama or LiteLLM often fails (symptom: "Context limit: 2048 tokens" at startup). The ConfigMap comments name that coupling, so a change to one is made to the other.
+- **Known deviation:** upstream Hermes wants at least 64k context, but the 16GB VRAM budget (spec 02) allows 32k. This is accepted and verified at 32k, and Hermes context compression is enabled so long sessions degrade gracefully. Symptoms of trouble (forgetting, truncated output) are documented in the README.
 - OpenViking (`http://openviking.openviking.svc`) is configured as the memory, knowledge and skills backend. It is wired through MCP via the LiteLLM MCP gateway (spec 09) if Hermes supports it, and through the closest supported integration (HTTP tool or skill) otherwise. The chosen path is documented in `deploy/hermes/README.md`.
 
 **Storage**
@@ -43,7 +44,8 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 ## Acceptance Criteria
 - [ ] The image builds from the repo with a pinned Hermes version, and no network fetch of install scripts occurs at runtime.
 - [ ] Pod `hermes` is Running in namespace `hermes`, with `~/.hermes` on a PVC backed by the WSL ext4 volume.
-- [ ] `~/.hermes/config.yaml` matches the ConfigMap and shows the LiteLLM `/v1` URL, the `chat` alias and context length 32768.
+- [ ] `~/.hermes/config.yaml` matches the ConfigMap and shows the LiteLLM `/v1` URL, the `chat` alias and context length 32768, and startup reports a 32768-token context limit (not 2048).
+- [ ] A multi-step tool-using task completes at the 32k window, with the result of the 64k-versus-32k deviation recorded in `deploy/hermes/README.md`.
 - [ ] Deleting the pod preserves `~/.hermes` contents (sessions, skills) after the replacement starts.
 - [ ] `kubectl auth can-i --list` from inside the pod shows no cluster permissions, and no token exists at `/var/run/secrets/kubernetes.io`.
 - [ ] The container runs as a non-root user with no extra capabilities and no `hostPath` volumes, and resource limits are set.
