@@ -17,7 +17,7 @@ mcp_servers:
     allowed_tools: [browser_navigate, browser_snapshot]   # server-level allowlist
     access_groups: [browsing]
   openviking:
-    url: http://openviking.openviking.svc:1933/mcp        # only if OpenViking exposes MCP
+    url: http://openviking.openviking.svc:1933/mcp        # OpenViking serves Streamable HTTP MCP on its API port
     transport: http
     auth_type: bearer_token
     auth_value: os.environ/OPENVIKING_MCP_TOKEN
@@ -25,7 +25,7 @@ mcp_servers:
 - `auth_type`: `api_key | bearer_token | basic | oauth2 | aws_sigv4`. `static_headers` and `extra_headers` forward custom headers. `server_id` pins permissions if the URL changes. `allow_all_keys: true` exposes a server to every key (do not set it here).
 - `stdio` servers run as child processes of the proxy and are disabled unless `LITELLM_ENABLE_MCP_STDIO=true`. dsm-shai should use network (http) servers in their own pods, so the browser pod can be sandboxed.
 - Servers defined in `config.yaml` persist in the DB only with `store_model_in_db: true` (or `supported_db_objects: ["mcp"]`). UI and API registrations live in the DB.
-- OpenViking's own MCP endpoint and port are not confirmed. Check [[openviking-service-deployment]] before writing the entry.
+- OpenViking exposes MCP at `/mcp` on port 1933 and needs a user or admin key (not the root key) as the bearer token. See [[openviking-ollama-models-and-mcp]] and [[openviking-service-deployment]].
 
 ## Calling the gateway
 
