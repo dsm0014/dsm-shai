@@ -11,3 +11,4 @@
 | 07 | [Secrets Management and Backup/Restore](./07-secrets-backup.md) | TODO |
 | 08 | [Istio Service Mesh](./08-istio-service-mesh.md) | TODO |
 | 09 | [LiteLLM Gateway](./09-litellm-gateway.md) | TODO |
+| 10 | [GitOps with Flux](./10-flux-gitops.md) | TODO |

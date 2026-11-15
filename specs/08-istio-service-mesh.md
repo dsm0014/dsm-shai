@@ -20,6 +20,7 @@ Adopt Istio (ambient mode) as the security, routing and egress-control layer of 
 - **Telemetry:** Istio and ztunnel metrics (`istio_tcp_*`, plus waypoint `istio_requests_total`) are scraped by the spec 06 Prometheus. Ship a ServiceMonitor/PodMonitor and a Grafana mesh dashboard. Mind metric cardinality and retention on the single node.
 - **Kiali:** optional and off by default (`kiali.enabled=false`). When enabled it must fit the memory budget and sit behind the ingress gateway.
 - **Rollout order:** (1) k3s with Traefik disabled; (2) istio-base, istio-cni, istiod, ztunnel; (3) ingress gateway with Open WebUI and Grafana routes; (4) enrol namespaces with PERMISSIVE mTLS and verify; (5) add ALLOW policies, then default-deny; (6) switch mTLS to STRICT; (7) apply egress REGISTRY_ONLY with the Hermes allowlist. Verify after each step.
+- **Delivery:** with Flux (spec 10) this order is encoded as `dependsOn` chains (HelmRelease chain for base, cni, istiod, ztunnel, gateway, then policies last), and the PERMISSIVE-to-STRICT and egress steps are commits (or resumed Kustomizations). The shell steps remain documented as the manual and break-glass path. `flux-system` stays out of the mesh.
 - **Rollback:** every step is reversible. Remove the namespace label to leave the mesh, delete the policies, and set mTLS back to PERMISSIVE and egress to ALLOW_ANY. A full uninstall script restores prior NetworkPolicies. Keep the NetworkPolicy manifests from specs 03/04/05 available until the mesh policies are verified.
 
 ## Acceptance Criteria

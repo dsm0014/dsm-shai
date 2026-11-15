@@ -16,7 +16,7 @@ Prepare the Windows 11 + WSL2 host and a single-node k3s cluster with GPU access
 
 **Tooling**
 - `kubectl`, `helm`, `k3s`, and `nvidia-ctk` (NVIDIA Container Toolkit) are installed. Each is pinned to a documented version.
-- The install steps are scripted and idempotent under `scripts/`. Re-running them on a configured host changes nothing.
+- Host-level setup (WSL config, k3s, NVIDIA toolkit, `flux` CLI) is scripted under `scripts/`. Everything in-cluster is delivered by Flux (spec 10) from `deploy/` after `scripts/bootstrap-flux.sh`. The install steps are scripted and idempotent under `scripts/`. Re-running them on a configured host changes nothing.
 
 **Cluster**
 - k3s runs as a systemd service in single-node mode. It uses the bundled containerd. Traefik is disabled (`--disable=traefik`) because the Istio ingress gateway (spec 08) is the single entry point; servicelb stays at its default.
