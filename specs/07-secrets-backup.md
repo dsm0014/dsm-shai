@@ -3,7 +3,7 @@
 **Status:** TODO
 
 ## Purpose
-Define how secrets are stored in git and how irreplaceable cluster state is backed up and restored on the single-node k3s stack. Protect against loss of the WSL ext4 volume, which is a single point of failure for all local-path PVCs. Depends on spec 01 (cluster, storage) and specs 03-06 (the data to protect).
+Define how secrets are stored in git and how irreplaceable cluster state is backed up and restored on the single-node k3s stack. Protect against loss of the WSL ext4 volume, which is a single point of failure for all local-path PVCs. Depends on spec 01 (cluster, storage) and specs 03-06 and 08-09 (the data to protect).
 
 ## Behavior
 
@@ -13,7 +13,7 @@ Define how secrets are stored in git and how irreplaceable cluster state is back
 - The existing `.gitignore` entries (`.env`, `*.key`, `*.agekey`, `secrets.yaml`, `*.dec.yaml`) stay in force. Encrypted files use a distinct name (e.g. `*.sops.yaml`) so they are not ignored.
 - A documented workflow covers generating the key, encrypting, editing (`sops <file>`), decrypting, and applying, plus rotating the key and re-encrypting.
 - `scripts/apply-secrets.sh` decrypts with `sops -d` and pipes the output straight into `kubectl apply -f -`. It never writes plaintext to disk, fails closed if the key is missing, and does not echo secret values.
-- Consumers: Open WebUI `WEBUI_SECRET_KEY` (spec 05) and the Grafana admin credential (spec 06). Ollama, OpenViking and Hermes use no real secrets (specs 02-04), so none are created for them.
+- Consumers: Open WebUI `WEBUI_SECRET_KEY` (spec 05), the Grafana admin credential (spec 06), and the LiteLLM master key, per-consumer virtual keys (`hermes`, `openviking`, `open-webui`) and Postgres password (spec 09). Ollama uses no secrets (spec 02); Hermes, OpenViking and Open WebUI hold only their own LiteLLM virtual key.
 
 **Backup scope and destination**
 - In scope:
@@ -21,6 +21,8 @@ Define how secrets are stored in git and how irreplaceable cluster state is back
   - OpenViking data (spec 03)
   - Open WebUI data (spec 05)
   - Grafana data (spec 06)
+  - LiteLLM Postgres (spec 09), captured with `pg_dump` rather than a file copy
+  - Istio configuration and the istiod root CA secret in `istio-system` (spec 08)
   - A k3s datastore snapshot (etcd/SQLite) taken via `k3s etcd-snapshot save` or a consistent copy of the SQLite state.
 - Out of scope: Ollama model weights (re-pullable), which are explicitly excluded.
 - The destination is outside the WSL virtual disk, either a Windows-side folder (e.g. `/mnt/c/Users/<user>/Backups/dsm-shai`) or an external drive. The path is configurable.
@@ -43,6 +45,6 @@ Define how secrets are stored in git and how irreplaceable cluster state is back
 - [ ] A manual backup run produces an encrypted repository outside the WSL virtual disk containing all in-scope data and no Ollama model weights.
 - [ ] The scheduled job runs unattended, and a log or status shows a successful run within the last 24h.
 - [ ] Retention prunes old snapshots, and repository size stays under the documented cap.
-- [ ] Restore drill: after deleting the PVC data (or on a fresh namespace or cluster), following `docs/restore.md` alone recovers Hermes sessions and skills, OpenViking data, Open WebUI users and chats, and Grafana dashboards. The drill outcome and date are recorded.
+- [ ] Restore drill: after deleting the PVC data (or on a fresh namespace or cluster), following `docs/restore.md` alone recovers Hermes sessions and skills, OpenViking data, Open WebUI users and chats, Grafana dashboards, and LiteLLM virtual keys. The drill outcome and date are recorded.
 - [ ] The restore drill also confirms that the backup cannot be read without the repository password, and that secrets decrypt only with the backed-up age key.
 - [ ] `wsl --export` fallback steps are documented and tested once.

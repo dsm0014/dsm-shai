@@ -8,7 +8,7 @@ Run a single Ollama instance on the k3s cluster as the only local inference endp
 ## Behavior
 - Deploy Ollama as a single-replica Deployment (strategy `Recreate`) in namespace `ollama` with `runtimeClassName: nvidia` and `nvidia.com/gpu: 1`. Expose it through a ClusterIP Service on port 11434.
 - Back `/root/.ollama` with a PVC (at least 50Gi) on the WSL ext4 volume, not a `/mnt/c` path. Models must survive pod restarts.
-- Serve the OpenAI-compatible API at `/v1` (chat completions with tool calls, embeddings) for Hermes Agent and OpenViking. No other inference endpoint exists in the cluster.
+- Serve the OpenAI-compatible API at `/v1` (chat completions with tool calls, embeddings) to LiteLLM (spec 09), its only caller. No other inference backend exists in the cluster; Hermes, OpenViking and Open WebUI reach models only through LiteLLM.
 - Set the server env explicitly:
   - `OLLAMA_CONTEXT_LENGTH=32768`, raised to 65536 only if the budget below still holds.
   - `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0`, to roughly halve the KV cache.
@@ -42,7 +42,7 @@ Chat and VLM together would need about 18.3GiB, which exceeds the card. This is 
 ## Acceptance Criteria
 - [ ] Namespace `ollama` has one Running pod using `RuntimeClass nvidia`, and `nvidia-smi` inside the pod shows the RTX 4080.
 - [ ] The models PVC is bound on the WSL ext4 volume, and the models are still present after `kubectl delete pod`.
-- [ ] `curl http://ollama.ollama.svc:11434/v1/models` from another namespace lists `qwen3:14b`, `nomic-embed-text` and `qwen2.5vl:3b`.
+- [ ] `curl http://ollama.ollama.svc:11434/v1/models` from a pod in the `litellm` namespace lists `qwen3:14b`, `nomic-embed-text` and `qwen2.5vl:3b`.
 - [ ] A `/v1/chat/completions` request with a tool definition to `qwen3:14b` returns a well-formed `tool_calls` response.
 - [ ] A `/v1/embeddings` request to `nomic-embed-text` returns a vector.
 - [ ] A `/v1/chat/completions` request with an image to `qwen2.5vl:3b` returns a description.
@@ -50,4 +50,4 @@ Chat and VLM together would need about 18.3GiB, which exceeds the card. This is 
 - [ ] Peak VRAM during steady state (chat + embed) is at most 15.0GiB. Measured values are recorded in the budget table.
 - [ ] Requesting the VLM while chat is loaded evicts chat and keeps the embedding model resident. The reverse swap also works, and no request fails with an out-of-memory error.
 - [ ] Re-running the preload Job with all models present completes without re-downloading and without errors.
-- [ ] The Service is not reachable from outside the cluster.
+- [ ] The Service is not reachable from outside the cluster. Once spec 08 is applied, requests from namespaces other than `litellm` are denied.

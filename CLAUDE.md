@@ -16,6 +16,8 @@
 - Models of 30B+ do not fit and are out of scope.
 - Agent context needs 32k-64k tokens; KV cache counts against the VRAM budget.
 - Everything runs locally; no cloud model providers.
+- Istio (ambient mode) provides mTLS, authorization, the single ingress gateway and hostname-level egress control (spec 08). Traefik is disabled.
+- LiteLLM (free tier) is the only caller of Ollama and the routing gateway for models and MCP/browser tools (spec 09). Consumers use per-consumer virtual keys.
 
 ## Conventions
 

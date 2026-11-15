@@ -19,7 +19,7 @@ Prepare the Windows 11 + WSL2 host and a single-node k3s cluster with GPU access
 - The install steps are scripted and idempotent under `scripts/`. Re-running them on a configured host changes nothing.
 
 **Cluster**
-- k3s runs as a systemd service in single-node mode. It uses the bundled containerd, with Traefik and servicelb left at defaults unless a later spec overrides them.
+- k3s runs as a systemd service in single-node mode. It uses the bundled containerd. Traefik is disabled (`--disable=traefik`) because the Istio ingress gateway (spec 08) is the single entry point; servicelb stays at its default.
 - The kubeconfig is readable by the non-root user, and `kubectl get nodes` shows the node `Ready`.
 - `nvidia-ctk runtime configure` registers the `nvidia` runtime with k3s's containerd. A `RuntimeClass` named `nvidia` exists.
 - The NVIDIA device plugin is deployed (manifest or Helm chart in `deploy/`). The node advertises `nvidia.com/gpu: 1` as allocatable.
@@ -27,11 +27,11 @@ Prepare the Windows 11 + WSL2 host and a single-node k3s cluster with GPU access
 
 **Storage**
 - The k3s `local-path` provisioner is the default `StorageClass`. Its data path sits on the WSL ext4 volume, not under `/mnt/c`.
-- Dedicated namespaces exist for the workloads: `ollama`, `openviking`, and `hermes`.
+- Dedicated namespaces exist for the workloads: `ollama`, `openviking`, and `hermes`. Later specs create `open-webui`, `monitoring`, `istio-system`, `litellm` and `browser`.
 - A test PVC binds and keeps its data across pod restarts.
 
 **Repo layout**
-- `deploy/` has one subdirectory per concern: `platform/` (GPU plugin, runtime class, storage), `ollama/`, `openviking/`, and `hermes/`. Each workload directory has a README stub.
+- `deploy/` has one subdirectory per concern: `platform/` (GPU plugin, runtime class, storage), `ollama/`, `openviking/`, and `hermes/`. Later specs add `istio/`, `litellm/`, `browser/`, `open-webui/` and `monitoring/`. Each workload directory has a README stub.
 - Manifests are declarative and applied with `kubectl apply -k` or `helm upgrade --install`. No secrets are committed.
 - A top-level `deploy/README.md` documents the bootstrap order and the teardown and rollback steps.
 
@@ -44,6 +44,7 @@ Prepare the Windows 11 + WSL2 host and a single-node k3s cluster with GPU access
 - [ ] `nvidia-smi` in WSL shows the RTX 4080 with 16GB.
 - [ ] `kubectl version`, `helm version`, `k3s --version`, and `nvidia-ctk --version` all succeed.
 - [ ] `kubectl get nodes` shows one node `Ready`.
+- [ ] k3s was started with `--disable=traefik`, and no Traefik pods or IngressRoutes exist in `kube-system`.
 - [ ] `kubectl describe node` lists `nvidia.com/gpu: 1` under Allocatable.
 - [ ] The GPU smoke-test pod completes and its logs show the RTX 4080.
 - [ ] A test PVC on the default `StorageClass` binds, and its data survives pod deletion.
