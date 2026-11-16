@@ -66,6 +66,7 @@ spec:
           args: ["gateway", "run"]             # headless: long-lived foreground gateway (recommended for containers)
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true       # tested 2026-11-16: only /tmp, /opt/data and /workspace are written
             capabilities:
               drop: ["ALL"]
           env:
@@ -91,6 +92,8 @@ spec:
               mountPath: /opt/data
             - name: workspace
               mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: home
           persistentVolumeClaim:
@@ -101,3 +104,6 @@ spec:
         - name: workspace
           emptyDir:
             sizeLimit: 10Gi
+        - name: tmp                            # Node compile cache, uv locks, runtime scratch
+          emptyDir:
+            sizeLimit: 1Gi

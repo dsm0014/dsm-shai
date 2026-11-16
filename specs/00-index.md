@@ -7,7 +7,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 01 | [Platform Foundation](./01-platform-foundation.md) | IN PROGRESS | `wsl --shutdown` restart test (not run from inside the distro); second-run no-op check; `deploy/README.md` bootstrap order |
 | 02 | [Ollama Inference](./02-ollama-inference.md) | DONE | Amended: chat model `qwen3.5:9b` (thinking on), context 65536 (see the amendments) |
 | 03 | [OpenViking Context Service](./03-openviking-context.md) | DONE | Read-only root filesystem (not in the spec's criteria) |
-| 04 | [Hermes Agent](./04-hermes-agent.md) | PARTIAL | Browser MCP tools; LiteLLM MCP gateway registration; hostname egress allowlist; `readOnlyRootFilesystem` |
+| 04 | [Hermes Agent](./04-hermes-agent.md) | PARTIAL | Browser MCP tools; LiteLLM MCP gateway registration; hostname egress allowlist |
 | 05 | [Web UI Ingress](./05-web-ui-ingress.md) | PARTIAL | Windows and LAN reachability checks; Open WebUI egress limited to LiteLLM and DNS |
 | 06 | [Observability](./06-observability.md) | PARTIAL | Mesh metrics and dashboard; LAN and Windows checks |
 | 07 | [Secrets Management and Backup/Restore](./07-secrets-backup.md) | PARTIAL | Live and fresh-cluster restore; k3s datastore snapshot (needs root); `wsl --export` not run; prune not yet observed |

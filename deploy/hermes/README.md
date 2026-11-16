@@ -106,7 +106,7 @@ If Hermes replies with nothing or "waiting for the provider to recover", check m
 - **Browser MCP tools** (spec 04 and spec 09 `deploy/browser/`): not deployed. Only `hermes` gets browser tools.
 - **LiteLLM MCP gateway**: Hermes connects to OpenViking's MCP endpoint directly, not through the gateway. Register it with LiteLLM when the gateway's MCP support is set up.
 - **Egress and network policy** (spec 04 and spec 08 part B, step 11): the Kubernetes API server is reachable from the pod's network (TLS verification fails, but a route exists). Istio `REGISTRY_ONLY` and the NetworkPolicy must close that.
-- **`readOnlyRootFilesystem`**: not set. The Hermes install writes its runtime files under the image path. Needs a test.
+- **`readOnlyRootFilesystem`**: on (tested 2026-11-16). The gateway starts, reconnects to OpenViking and answers a chat with only `/opt/data` (PVC), `/workspace` and an `emptyDir` on `/tmp` writable. Writing under `/opt/hermes` fails with "Read-only file system" as intended.
 - **Flux**: the `hermes` Kustomization is not in `clusters/dsm-shai/` yet. It goes in after the branch is merged to `main`.
 
 ## Operation
