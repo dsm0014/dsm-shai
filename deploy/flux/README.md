@@ -37,8 +37,8 @@ SOPS with age (`.sops.yaml`, `encrypted_regex: ^(data|stringData)$`). The decryp
 |---|---|
 | `flux suspend` / `resume` on the `istio` stage | suspended state shown; resumed and reapplied the same revision (`main@0271961c`) |
 | Controller memory (`kubectl top`) | helm 59 Mi, kustomize 107 Mi, source 82 Mi (limit 512 Mi each) |
-| Deliberate break (a bad Istio value blocks downstream) | **not run**: it needs a push to `main` |
-| `git revert` rollback | **not run**: it needs a push to `main` |
+| Deliberate break: a bad value blocks the dependent stage | **done** on a throwaway branch and separate test Kustomizations (`breaktest-a` to `breaktest-b`, `dependsOn`): `breaktest-a` failed its dry-run (`.spec.replicas` expected numeric), `breaktest-b` reported `DependencyNotReady` |
+| `git revert` rollback | **done** on the same throwaway branch: reverting the break commit, then reconcile, returned both stages to Ready and applied the downstream object. Test objects and the branch were removed afterwards |
 | Egress REGISTRY_ONLY for Flux | **n/a**: Flux's own egress is handled by the NetworkPolicies in `flux-system` (`allow-egress`, `allow-scraping`, `allow-webhooks`) |
 
 The two tests that need a push to `main` are left for when you decide to merge. Running them on a throwaway branch would not exercise the real reconciliation.
