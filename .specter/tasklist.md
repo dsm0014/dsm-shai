@@ -37,6 +37,7 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
 - [x] **6. Spec 02 — Ollama Inference.** Deploy Ollama with the VRAM budget, keep-alive and model pulls (chat, embed, VLM). Verify that models swap within the 16GB budget.
   - Done: Ollama 0.40.16 on the RTX 4080; three models on a 50Gi PVC; preload Job idempotent on rerun; API checks pass (`/v1/models`, `/v1/embeddings`, tool calls, vision); 28,843-token prompt at 32k context fully on GPU; VLM and chat swap with embed resident and no OOM; embed pinned by `ollama-embed-pin` CronJob. Measured values in `deploy/ollama/README.md`.
   - Open (moved to other steps): `/v1/models` from the `litellm` namespace (step 7); "not reachable from outside the cluster" denial check (step 11, spec 08 part B).
+  - Amended 2026-11-16: chat model is `llama3.1:8b` at a 64K context (Hermes requires 64K). Measurements are in `deploy/ollama/README.md`. The qwen3 figures above are the earlier baseline.
   - Depends on: 01, 07 part A. Enrolment in the mesh happens in step 11.
 - [~] **7. Spec 09 — LiteLLM Gateway.** Deploy LiteLLM in the `litellm` namespace with Postgres for virtual keys. Route the `chat`, `embed` and `vision` aliases to Ollama. Add the master key, the MCP and browser tool registrations, and the ServiceMonitor. Issue no consumer keys yet.
   - Done: LiteLLM 1.109.1 (pinned tag and digest) and Postgres 16 Ready; `chat`, `embed`, `vision` verified (streaming, tool calls, vision, embeddings); 401 for missing or wrong keys; a key limited to `chat` gets 403 on `embed` and is revoked on delete; concurrency limit (second in-flight call gets 429, no thrash); ServiceMonitor scraped (`up` = 1) with per-key and per-model labels; prompts not logged; SOPS-encrypted master key and DB password.
@@ -49,9 +50,9 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Depends on: 01, 07 part A, 09.
 
 - [~] **9. Spec 04 — Hermes Agent.** Deploy Hermes with its `hermes` virtual key, the browser MCP tools, and the OpenViking endpoint.
-  - Done: upstream image `v0.23.1` pinned by digest (not built locally; no build daemon here); `hermes` virtual key (chat only); config from ConfigMap; `/opt/data` on a 10Gi PVC; headless `gateway run` up; `hermes doctor` runs.
-  - **Blocked:** Hermes requires at least 64K context. The chat model serves 32K (spec 02 baseline). 64K does not fit the card with `qwen3:14b` (see deploy/hermes/README.md). Needs a decision: model, Hermes floor, or accepted window.
-  - Open: non-root container (upstream s6 init runs as root); OpenViking MCP wiring; browser MCP; the end-to-end task and the cross-session memory check; Istio egress allowlist (step 11).
+  - Done: upstream image `v0.23.1` pinned by digest (not built here); non-root (UID 10000, no s6 init); `hermes` virtual key (chat only); headless gateway; `/opt/data` persists across pod replacement; end-to-end task (file written and correct) with explicit tool instruction; memory written to OpenViking and recalled by a fresh session.
+  - Decision (2026-11-16): chat model changed to `llama3.1:8b` at 64K, because Hermes requires 64K context (spec 02 and 04 amendments).
+  - Open: browser MCP tools; LiteLLM MCP gateway registration (OpenViking is wired directly today); Istio egress allowlist and NetworkPolicy (step 11); `readOnlyRootFilesystem`; Flux stage (after merge). Model limits: explicit tool instructions needed.
   - Depends on: 02, 03, 08 part A, 09.
 
 - [ ] **10. Spec 05 — Web UI and Ingress.** Deploy Open WebUI with the `open-webui` virtual key and route it through the ingress gateway (host-local only, per spec 05).

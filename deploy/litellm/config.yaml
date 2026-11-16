@@ -2,7 +2,7 @@
 model_list:
   - model_name: chat
     litellm_params:
-      model: ollama_chat/qwen3:14b          # ollama_chat keeps tool-call support
+      model: ollama_chat/llama3.1:8b        # ollama_chat keeps tool-call support; 128K native, 64K served (see deploy/ollama/README.md)
       api_base: http://ollama.ollama.svc:11434
       timeout: 180                          # cold swap ~35s + 30k-token prompt ~60s + generation; also bounds an Ollama outage
       max_parallel_requests: 2              # extra concurrent chat calls get rejected (429) rather than thrash the GPU

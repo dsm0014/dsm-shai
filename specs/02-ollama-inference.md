@@ -2,6 +2,8 @@
 
 **Status:** DONE (spec 08 part B NetworkPolicy check and the `litellm` caller check still pending; see deploy/ollama/README.md)
 
+> **Amendment (2026-11-16):** the chat model is `llama3.1:8b` (Q4_K_M, 128K native), not `qwen3:14b`, and `OLLAMA_CONTEXT_LENGTH` is 65536. Reason: Hermes Agent refuses any model below 64K context, and `qwen3:14b` cannot serve 64K on this card (the scheduler shrinks it to 40960 with q8 and q4_0 KV). The VRAM measurements are in deploy/ollama/README.md. The VLM and embedding models are unchanged.
+
 ## Purpose
 Run a single Ollama instance on the k3s cluster as the only local inference endpoint. It serves a tool-calling chat model, an embedding model and a small vision-language model inside the 16GB RTX 4080 VRAM budget. Depends on Spec 01 (platform-foundation) for the cluster, NVIDIA device plugin and namespaces.
 

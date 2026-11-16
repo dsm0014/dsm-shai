@@ -50,17 +50,35 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000                       # hermes user in the image
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: hermes
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
+          # Skip the s6 /init (root PID 1). The init container has already set ownership and seeded config.
+          command: ["/opt/hermes/docker/main-wrapper.sh"]
           args: ["gateway", "run"]             # headless: long-lived foreground gateway (recommended for containers)
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
-            - name: OPENAI_API_KEY
+            - name: LITELLM_HERMES_KEY          # read via model.key_env in config.yaml
               valueFrom:
                 secretKeyRef:
                   name: hermes-secrets
                   key: litellm-key
+            - name: OPENVIKING_KEY              # ${OPENVIKING_KEY} in mcp_servers headers (config.yaml)
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: openviking-key
           resources:
             requests:
               cpu: 500m

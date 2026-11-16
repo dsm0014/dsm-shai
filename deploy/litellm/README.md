@@ -6,7 +6,7 @@ LiteLLM gateway (spec 09). Namespace `litellm`. Image `docker.io/litellm/litellm
 
 | Alias | Backend | Notes |
 |---|---|---|
-| `chat` | `ollama_chat/qwen3:14b` | tool calls and streaming verified |
+| `chat` | `ollama_chat/llama3.1:8b` | tool calls and streaming verified; 64K context served by Ollama (see the Ollama README) |
 | `embed` | `ollama/nomic-embed-text:v1.5` | 768-dim |
 | `vision` | `ollama_chat/qwen2.5vl:3b` | image input verified |
 
@@ -39,7 +39,7 @@ Consumer keys (`hermes`, `openviking`, `open-webui`) are issued when their consu
 
 ## Timeouts and Ollama outage
 
-- `chat` and `vision` use `timeout: 180` (covers a cold swap of about 35 s, a 30k-token prompt, and generation). `embed` uses 60 s.
+- `chat` and `vision` use `timeout: 180` (covers a cold swap, a long prompt, and generation). `embed` uses 60 s. The cold-swap time for `llama3.1:8b` is about 4 s after a VLM eviction and about 40 s from a cold start.
 - **Deviation:** an Ollama outage is not an instant failure. The `ollama` Service has no endpoints, and kube-proxy drops the SYN rather than rejecting it, so a raw TCP connect hangs for about 133 s. LiteLLM therefore fails after the total `timeout` (verified: a 60 s setting returned HTTP 408 after 60.6 s). With 180 s, the worst case is about 3 minutes. No fallback is attempted (verified in the log: `No fallback was attempted`). A proper fail-fast needs a REJECT rule or a readiness-gated connect, which is outside this spec.
 
 ## Metrics (spec 06)

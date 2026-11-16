@@ -1,8 +1,23 @@
 # Hermes config (spec 04). The ConfigMap is the source of truth: an init container copies it into
 # HERMES_HOME (/opt/data) on every start. Keep context_length equal to OLLAMA_CONTEXT_LENGTH (spec 02).
 model:
-  default: "chat"                                # LiteLLM alias -> qwen3:14b
+  default: "chat"                                # LiteLLM alias -> llama3.1:8b
   provider: "custom"                             # any OpenAI-compatible endpoint
   base_url: "http://litellm.litellm.svc:4000/v1" # the only model route (no direct Ollama)
-  context_length: 32768
+  key_env: "LITELLM_HERMES_KEY"                  # env var holding the LiteLLM virtual key (hermes)
+  context_length: 65536                          # = OLLAMA_CONTEXT_LENGTH; Hermes floor is 64K
   streaming: true
+
+# Agent behaviour. llama3.1:8b has no thinking mode (Ollama rejects "think"), so reasoning is off.
+# The built-in memory toolset is disabled so that OpenViking is the only memory backend (spec 04).
+agent:
+  reasoning_effort: "none"
+  disabled_toolsets: ["memory"]
+
+# OpenViking as memory/knowledge backend over MCP (spec 04). Direct to OpenViking for now: the LiteLLM MCP
+# gateway registration (spec 09) is not yet in place. Key is the tenant user key for account "hermes".
+mcp_servers:
+  openviking:
+    url: "http://openviking.openviking.svc:1933/mcp"
+    headers:
+      X-API-Key: "${OPENVIKING_KEY}"

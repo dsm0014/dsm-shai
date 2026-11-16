@@ -23,7 +23,7 @@ spec:
             - |
               set -eu
               until ollama list >/dev/null 2>&1; do echo "waiting for ollama"; sleep 5; done
-              for m in qwen3:14b nomic-embed-text:v1.5 qwen2.5vl:3b; do
+              for m in llama3.1:8b nomic-embed-text:v1.5 qwen2.5vl:3b; do
                 echo "pulling $m"
                 ollama pull "$m"
               done
@@ -39,8 +39,8 @@ spec:
               curl -sf -H 'Content-Type: application/json' \
                 -d '{"model":"nomic-embed-text:v1.5","input":"warmup","keep_alive":-1}' \
                 http://ollama.ollama.svc:11434/api/embed >/dev/null
-              echo "warming chat model"
+              echo "warming chat model (llama3.1:8b)"
               curl -sf -H 'Content-Type: application/json' \
-                -d '{"model":"qwen3:14b","prompt":"ok","stream":false,"options":{"num_predict":1}}' \
+                -d '{"model":"llama3.1:8b","prompt":"ok","stream":false,"options":{"num_predict":1}}' \
                 http://ollama.ollama.svc:11434/api/generate >/dev/null
               echo "preload complete"

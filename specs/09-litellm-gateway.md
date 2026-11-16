@@ -2,6 +2,8 @@
 
 **Status:** PARTIAL (gateway, keys, metrics verified; MCP/browser registration, consumer integrations, Istio deny and backup pending; see deploy/litellm/README.md)
 
+> **Amendment (2026-11-16):** the `chat` alias routes to `ollama_chat/llama3.1:8b`, not `qwen3:14b` (see the spec 02 amendment).
+
 ## Purpose
 Deploy the free open-source LiteLLM proxy (no enterprise-licensed features) in its own k3s namespace `litellm` as the single routing gateway for models, MCP tools, and browser automation between all consumers and backends. Depends on specs 01, 02, 03, 04, 05, 07, 08.
 

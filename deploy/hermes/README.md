@@ -1,61 +1,64 @@
 # deploy/hermes
 
-Hermes Agent (spec 04), namespace `hermes`. Status: **deployed, gateway running, blocked on the model context floor** (see below).
+Hermes Agent (spec 04), namespace `hermes`. Status: **running headless, non-root, with a working end-to-end task and OpenViking memory**. Open items at the end.
 
 ## Image
 
 `docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08`
 
-Deviation from spec 04: the spec asks for a build from `deploy/hermes/`. This cluster has no container build daemon (no Docker daemon, no root for `k3s ctr`). The upstream project publishes this image on every release, so it is pinned by digest instead of built here. Bump it by tag and digest together.
+Deviation from spec 04: the spec asks for a build from `deploy/hermes/`. This cluster has no container build daemon (no Docker daemon, no root for `k3s ctr`). The upstream project publishes this image on each release, so it is pinned by digest. Bump the tag and digest together.
 
-## Config
+## Pod
 
-`config.yaml` (ConfigMap `hermes-config`) is copied to `/opt/data/config.yaml` by an init container on each start:
-
-- `model.provider: custom`, `base_url: http://litellm.litellm.svc:4000/v1`, `model.default: chat`.
-- The key comes from env `OPENAI_API_KEY`, which is the LiteLLM virtual key `hermes` (allowlist `chat`, budget 20, 60 rpm), from SOPS Secret `hermes-secrets`.
-- No direct Ollama URL. No cloud provider.
-
-Hermes data (`HERMES_HOME`) is `/opt/data` on PVC `hermes-home` (10Gi, `local-path`). The image uses that path, not `~/.hermes`. The init container sets it to owner `10000` (`hermes`) with mode `0750`. Hermes refuses to start with a world-writable `/opt/data`.
-
-Headless: `args: ["gateway", "run"]`, the foreground gateway that the image recommends for containers. `hermes -z "..."` and interactive `hermes chat` both use the running gateway.
-
-## Current blocker: 64K context floor
-
-Hermes refuses any model below 64,000 tokens of context (`agent/agent_init.py`, `_enforce_minimum_context`). Observed error:
-
-> Model chat has a context window of 32,768 tokens, which is below the minimum 64,000 required by Hermes Agent.
-
-For a local endpoint, the floor is satisfied only when Ollama really serves 64K, through `OLLAMA_CONTEXT_LENGTH` or `model.ollama_num_ctx`. Measured on this card (RTX 4080, 16 GiB, `qwen3:14b`, embed resident):
-
-| Setting | Result |
-|---|---|
-| `OLLAMA_CONTEXT_LENGTH=32768`, KV `q8_0` (spec 02 baseline) | loads and serves 32k; 28.8k-token prompt verified; **below floor** |
-| `OLLAMA_CONTEXT_LENGTH=65536`, KV `q8_0` | scheduler shrinks the loaded context to 40960 (predicted 14.9 GiB > 14.4 GiB available); **below floor** |
-| `OLLAMA_CONTEXT_LENGTH=65536`, KV `q4_0` | still shrinks to 40960 (same estimate); **below floor** |
-
-Setting `model.context_length` to 64000 in config would pass Hermes's check but not the server's real window. Ollama truncates any prompt longer than its loaded context to about half, silently. That is not an acceptable workaround.
-
-Decision needed (see the status message for options): change the chat model to one with a native 64K window that fits the card, relax the Hermes floor in a rebuilt image, or accept a smaller window with Hermes configured for it.
-
-## Safety posture (as deployed)
-
-- ServiceAccount `hermes` with `automountServiceAccountToken: false`. No RBAC.
+- Runs as `hermes` (UID 10000) with `runAsNonRoot`, `RuntimeDefault` seccomp, no privilege escalation, all capabilities dropped. The upstream s6 init (root PID 1) is bypassed: the command is `/opt/hermes/docker/main-wrapper.sh gateway run`. An init container has already set ownership and seeded config.
+- Headless: the long-lived foreground gateway. `hermes -z "..."` (one-shot) and `hermes chat` both use it.
+- `/opt/data` (`HERMES_HOME`) is PVC `hermes-home` (10Gi, `local-path`, WSL ext4). Persistence verified across a pod replacement. The image uses `/opt/data`, not `~/.hermes`.
 - `/workspace` is an `emptyDir` with `sizeLimit: 10Gi`.
-- No `hostPath`, no Docker or containerd socket.
-- Resource requests 500m/2Gi, limits 2/4Gi.
+- ServiceAccount `hermes`, `automountServiceAccountToken: false`. No token directory in the pod. No RBAC.
+- No `hostPath`, no Docker or containerd socket. Requests 500m/2Gi, limits 2/4Gi.
 
-Not yet met (spec 04):
+## Config (`config.yaml`, ConfigMap `hermes-config`)
 
-- **Non-root container.** The upstream image's PID 1 is s6-overlay running as root. It remaps the UID and then drops to `hermes` (UID 10000) for the workload. Hermes runs as non-root, but the container's init does not, so `runAsNonRoot` cannot be set. Needs an image decision (see the same status message).
-- `readOnlyRootFilesystem`, `seccompProfile`, dropped capabilities: deferred until the init model is settled.
-- Egress allowlist (Istio `REGISTRY_ONLY`) and the NetworkPolicy: step 11.
-- OpenViking MCP wiring (`http://openviking.openviking.svc:1933/mcp`, key from the `openviking` account): needs a tenant key for Hermes. Route through the LiteLLM MCP gateway if the OSS release supports it, else direct; not yet registered.
+Copied to `/opt/data/config.yaml` by the init container on every start. The ConfigMap is the source of truth.
+
+- `model`: `provider: custom`, `base_url: http://litellm.litellm.svc:4000/v1`, `default: chat`, `context_length: 65536` (must equal `OLLAMA_CONTEXT_LENGTH`; Hermes's floor is 64K), `key_env: LITELLM_HERMES_KEY`.
+- `agent.reasoning_effort: none`: `llama3.1:8b` has no thinking mode, and Ollama rejects a `think` parameter.
+- `agent.disabled_toolsets: [memory]`: OpenViking is the only memory backend.
+- `mcp_servers.openviking`: `http://openviking.openviking.svc:1933/mcp`, header `X-API-Key: ${OPENVIKING_KEY}` (tenant key for account `hermes`).
+
+Secrets (SOPS, `deploy/secrets/hermes.sops.yaml`): `litellm-key` (virtual key `hermes`, allowlist `chat`, budget 20, 60 rpm) and `openviking-key` (tenant user key). Both enter the pod as env vars.
+
+## Verification (done, 2026-11-16)
+
+| Check | Result |
+|---|---|
+| One-shot prompt through LiteLLM to `chat` (`llama3.1:8b`) | `PONG` |
+| End-to-end task with explicit terminal instruction: list the 3 largest files in `/workspace/data`, write `/workspace/largest.txt` | file written with `huge.bin`, `big.bin`, `mid.bin` (correct) |
+| Memory write: `mcp__openviking__remember` with a two-message submission | extracted into `viking://user/hermes/memories/profile.md` |
+| Same memory checked from outside the Hermes pod (OpenViking search with the tenant key) | found |
+| Fresh Hermes process recalls the stored code via `mcp__openviking__search` | recalled (the abstract of `profile.md` contains the fact) |
+| Pod replacement keeps `/opt/data` | file preserved |
+| No cluster credentials in the pod | no token directory |
+
+## Limits (llama3.1:8b, observed)
+
+- **Planning and tool use need explicit instructions.** Without an explicit tool instruction, the model stopped after one call and claimed the file was written; the file did not exist. With "you must use the terminal tool; run exactly this command", it worked.
+- **Tool-argument JSON is sometimes malformed** (`tool_call 'calls' is not valid JSON`). Hermes returns the error to the model, which usually retries. The `remember` call needed an exact-argument prompt. A multi-step `read` after `search` did not complete reliably. Recall worked when the search result itself held the fact.
+- **Memory extraction needs substance.** A one-line `remember` extracted 0 memories (the extraction model is the VLM alias). A two-message submission extracted 1.
+
+## Open items (spec 04)
+
+- **Browser MCP tools** (spec 04 and spec 09 `deploy/browser/`): not deployed. Only `hermes` gets browser tools.
+- **LiteLLM MCP gateway**: Hermes connects to OpenViking's MCP endpoint directly, not through the gateway. Register it with LiteLLM when the gateway's MCP support is set up.
+- **Egress and network policy** (spec 04 and spec 08 part B, step 11): the Kubernetes API server is reachable from the pod's network (TLS verification fails, but a route exists). Istio `REGISTRY_ONLY` and the NetworkPolicy must close that.
+- **`readOnlyRootFilesystem`**: not set. The Hermes install writes its runtime files under the image path. Needs a test.
+- **Flux**: the `hermes` Kustomization is not in `clusters/dsm-shai/` yet. It goes in after the branch is merged to `main`.
 
 ## Operation
 
 ```sh
-kubectl -n hermes logs deploy/hermes -c hermes --tail=100       # gateway log
-kubectl -n hermes exec deploy/hermes -- sh -c 'hermes doctor'    # config check
-kubectl -n hermes exec deploy/hermes -- sh -c 'hermes -z "..."'  # one-shot prompt (needs the gateway running)
+kubectl -n hermes logs deploy/hermes -c hermes --tail=100                       # gateway log
+kubectl -n hermes exec deploy/hermes -- sh -c 'hermes doctor'                    # config check
+kubectl -n hermes exec deploy/hermes -- sh -c 'hermes -z "..."'                  # one-shot prompt
+kubectl -n hermes exec deploy/hermes -- sh -c 'hermes logs | grep tool'          # tool activity
 ```
