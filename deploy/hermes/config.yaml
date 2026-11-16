@@ -10,6 +10,12 @@ model:
 
 # Agent behaviour. llama3.1:8b has no thinking mode (Ollama rejects "think"), so reasoning is off.
 # The built-in memory toolset is disabled so that OpenViking is the only memory backend (spec 04).
+# Tool Search (deferred tools behind bridge tools) is off: the bridge calls are not reliable with llama3.1:8b
+# (malformed tool_call wrappers). Tools are sent with their real names.
+tools:
+  tool_search:
+    enabled: "off"
+
 agent:
   reasoning_effort: "none"
   disabled_toolsets: ["memory"]
@@ -21,3 +27,7 @@ mcp_servers:
     url: "http://openviking.openviking.svc:1933/mcp"
     headers:
       X-API-Key: "${OPENVIKING_KEY}"
+    tools:
+      # Only the simple memory tools. OpenViking's search tool has a conditional parameter (detail needs mode=context)
+      # that the model gets wrong, so search is excluded.
+      include: ["find", "remember", "read", "list"]
