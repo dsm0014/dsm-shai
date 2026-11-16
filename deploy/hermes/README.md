@@ -83,7 +83,19 @@ Findings:
 
 ### Candidates (native context of at least 64K, fits 16 GiB)
 
-`qwen3.5:9b` (256K, vision, tools), `gemma4:12b` (256K), `ministral-3:8b` (256K), `gpt-oss:20b` (128K, about 14 GB, little VRAM left at 64K). Results are added below once measured.
+`qwen3.5:9b` (256K, vision, tools), `gemma4:12b` (256K), `ministral-3:8b` (256K), `gpt-oss:20b` (128K, about 14 GB, little VRAM left at 64K). `gemma4:12b` and `ministral-3:8b` are downloaded but not yet benchmarked.
+
+**`qwen3.5:9b`** (Ollama 0.40.16, same 8-case replay, 5 runs each):
+
+| `reasoning_effort` sent | Plain (15) | Tool calls (20) | Two-step (5) | Total (40) |
+|---|---|---|---|---|
+| `none` (what `config.yaml` sends today) | 15 | 15 (5 failures) | 5 | 37 |
+| not sent (thinking on, the model default) | 15 | 20 | 5 | **40** |
+| `medium` | 15 | 19 | 5 | 39 |
+
+- **Thinking must stay on.** With `reasoning_effort: none`, Ollama returned HTTP 500 (`XML syntax error ... element <function> closed by </parameter>`) on 4 to 6 of every 10 `read_file` calls: the model writes tool calls as XML, and Ollama's `qwen3.5` parser rejects a malformed one instead of returning it. Qwen's recommended sampling (`temperature 0.7, top_p 0.8, presence_penalty 1.5`) cut that to 2 of 10 but did not remove it. With thinking on, `read_file` succeeded 10 of 10. If this model is adopted, change `agent.reasoning_effort` away from `"none"`.
+- **It fits.** Loaded at `num_ctx 65536` it uses 6.43 GiB (hybrid attention keeps the cache small), 0.31 GiB more for the embedding model; the device was at 9.7 of 16 GiB, about 6.6 GiB free. Native context is 262144, so the 64K floor is not a constraint.
+- **Not yet tested:** real Hermes tasks through LiteLLM with this model (the replay sends Hermes's real request straight to Ollama, so it skips LiteLLM and Hermes's own loop), long multi-step tasks, and the memory-recall flow. Adopting it needs a change to `deploy/litellm/config.yaml` (`chat` alias), the model preload job, and the `reasoning_effort` above.
 
 ### After a restart
 
