@@ -6,7 +6,7 @@ Ollama inference (spec 02). Single replica, `Recreate`, RTX 4080 via `RuntimeCla
 
 | Role | Tag | Notes |
 |---|---|---|
-| Chat | `llama3.1:8b` (Q4_K_M, 128K native) | 64K served; tool calls verified; replaces `qwen3:14b` (see decision below) |
+| Chat | `qwen3.5:9b` (Q4_K_M, 256K native, vision, thinking) | 64K served in 6.43 GiB; replaces `llama3.1:8b` (see "Decision: chat model" below) |
 | Embedding | `nomic-embed-text:v1.5` | 768-dim; pinned resident |
 | VLM | `qwen2.5vl:3b` | image description verified |
 
@@ -19,6 +19,8 @@ Models live on the `ollama-models` PVC (50Gi, `local-path` on the WSL ext4 volum
 - `ollama-embed-pin` CronJob (every 5 min) re-pins the embedding model with `keep_alive: -1`. Needed because `/v1/embeddings` has no keep-alive parameter, so any embedding call resets the model to the default 10m.
 
 ## Decision: chat model and 64K context (2026-11-16)
+
+**Amended 2026-11-16 (later): the chat model is now `qwen3.5:9b`.** `llama3.1:8b` scored 21/40 on a replay of Hermes's real request (its Ollama template forces a tool call on every turn); `qwen3.5:9b` scored 40/40 with thinking on, loads at 64K in 6.43 GiB with the embedding model beside it (device 9.7 of 16 GiB), and has a 256K native context. Details and the thinking-mode requirement are in `deploy/hermes/README.md`, "Why Hermes failed". `llama3.1:8b`, `qwen3:14b` and any benchmark leftovers stay on the PVC but are no longer preloaded. The text below is the earlier decision, kept for the reasoning on `qwen3:14b`.
 
 Hermes Agent refuses any model below 64K context. `qwen3:14b` cannot serve 64K, but not because of VRAM: its trained context length is 40960 (`ollama show qwen3:14b`), and Ollama clamps any larger `num_ctx` to it. Measured 2026-11-16: asking for 64000 loads at 40960 and uses 11.79 GiB of the 16 GiB. (An earlier version of this note blamed the card.) The same cap applies to every `qwen3` 8b/14b tag, so only models with a native context of at least 64K qualify. The chat model is now `llama3.1:8b`, which runs at 64K with `q8_0` KV and fits beside the embedding model. `qwen3:14b` stays on the PVC for rollback but is no longer preloaded.
 
