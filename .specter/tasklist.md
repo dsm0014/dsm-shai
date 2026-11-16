@@ -55,7 +55,9 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: browser MCP tools; LiteLLM MCP gateway registration (OpenViking is wired directly today); Istio egress allowlist and NetworkPolicy (step 11); `readOnlyRootFilesystem`; Flux stage (after merge). Model limits: explicit tool instructions needed.
   - Depends on: 02, 03, 08 part A, 09.
 
-- [ ] **10. Spec 05 — Web UI and Ingress.** Deploy Open WebUI with the `open-webui` virtual key and route it through the ingress gateway (host-local only, per spec 05).
+- [~] **10. Spec 05 — Web UI and Ingress.** Deploy Open WebUI with the `open-webui` virtual key and route it through the ingress gateway (host-local only, per spec 05).
+  - Done: Open WebUI v0.13.3 (pinned by digest) as UID 1000; `OPENAI_API_BASE_URL` at LiteLLM with the `open-webui` key (`chat`, `vision`); `ENABLE_SIGNUP=False` (first admin, then 403); SearXNG skipped; PVC persists; Istio `Gateway` and `VirtualService` for `open-webui.localhost`; login, sign-in, models and a chat completion verified through the ingress.
+  - Open: mesh deny and egress checks (step 11); LAN and Windows checks; the persistent host listener for the gateway.
   - Depends on: 07 part A, 08 part A, 09.
 - [ ] **11. Spec 08 part B — Mesh enrolment and policy.** Enrol the namespaces in PERMISSIVE mTLS and verify each one. Add ALLOW policies, then default-deny. Switch to STRICT mTLS, with the documented Prometheus scrape exception. Apply REGISTRY_ONLY egress with the Hermes allowlist.
   - Depends on: 03, 04, 05, 06 part A, 09. Each sub-step is its own commit.

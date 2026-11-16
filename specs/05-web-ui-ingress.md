@@ -1,6 +1,6 @@
 # Spec 05 — Web UI Ingress
 
-**Status:** TODO
+**Status:** PARTIAL (deployed, ingress login and chat verified; mesh deny/egress checks and the LAN and Windows checks pending; see deploy/open-webui/README.md)
 
 ## Purpose
 

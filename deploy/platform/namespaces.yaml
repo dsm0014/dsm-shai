@@ -40,3 +40,11 @@ metadata:
   name: litellm
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-webui
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+
