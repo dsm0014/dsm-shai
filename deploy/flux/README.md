@@ -47,6 +47,10 @@ The two tests that need a push to `main` are left for when you decide to merge. 
 
 `flux-system` already has three NetworkPolicies (`allow-egress`, `allow-scraping`, `allow-webhooks`). They are not changed here.
 
+## Suspended stage (2026-11-16)
+
+`platform` is **suspended** on purpose. Its manifest on `main` lacks the ambient namespace labels, and Flux would remove them every 10 minutes (see `deploy/istio/README.md`). After `feat/istio-mesh` is merged, run `flux resume kustomization platform`.
+
 ## Operating
 
 ```sh

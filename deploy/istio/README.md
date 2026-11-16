@@ -64,6 +64,14 @@ Ollama (chat model at 64K) used about 7.6 GiB of container memory at the time of
 - **Mesh metrics in Grafana:** ztunnel and istiod metrics are not yet in a Prometheus ServiceMonitor or a dashboard (spec 06 part B, step 12).
 - **Grafana behind the gateway:** not routed. `kubectl port-forward` to mesh workloads is now refused by the deny-all policy, so use `kubectl exec` or a debug container for in-mesh checks.
 
+## Incident: enrolment lost to Flux (2026-11-16)
+
+- **What happened:** the `platform` Flux stage reconciles `deploy/platform/namespaces.yaml` from `main`. On `main`, the namespaces carried no ambient label, so Flux removed the labels I had added by hand (`ollama`, `hermes`, `openviking`, `monitoring`). Pods created after that were not redirected into ambient. Under STRICT, Hermes and OpenViking calls to LiteLLM were refused (`istio_converted_static_strict`), because their traffic went out without mTLS. `ollama` and `monitoring` were no longer enforced.
+- **Why it was not seen at once:** the backup restarted Hermes and OpenViking, and their new pods were the first created after the label was lost.
+- **Fix:** the labels are now in `deploy/platform/namespaces.yaml` on `feat/istio-mesh`. Until that branch is merged, the `platform` Flux stage is **suspended** (`flux suspend kustomization platform`), so Flux cannot strip the labels again. The labels were re-applied and the workloads restarted. Verified after the fix: the redirection annotation is `enabled` on all pods in the four namespaces; OpenViking and Hermes reach LiteLLM; LiteLLM reaches Ollama; Open WebUI and Hermes are refused on Ollama directly; a plaintext request from a non-mesh pod is refused; 19 Prometheus targets are up.
+- **Rule from this:** a namespace label that the mesh needs must be in the manifest that Flux owns, and a new pod must show the redirection annotation before a policy is trusted.
+- **After merging `feat/istio-mesh`:** run `flux resume kustomization platform`, then `flux reconcile kustomization platform`, and check the labels are still present.
+
 ## Rollback
 
 ```sh
