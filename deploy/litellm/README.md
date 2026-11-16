@@ -6,11 +6,13 @@ LiteLLM gateway (spec 09). Namespace `litellm`. Image `docker.io/litellm/litellm
 
 | Alias | Backend | Notes |
 |---|---|---|
-| `chat` | `ollama_chat/llama3.1:8b` | tool calls and streaming verified; 64K context served by Ollama (see the Ollama README) |
+| `chat` | `ollama_chat/qwen3.5:9b` | 256K native, 64K served by Ollama (see the Ollama README). Needs thinking on (`reasoning_effort` other than `none`), see `deploy/hermes/README.md`. Was `llama3.1:8b` until 2026-11-16 |
 | `embed` | `ollama/nomic-embed-text:v1.5` | 768-dim |
 | `vision` | `ollama_chat/qwen2.5vl:3b` | image input verified |
 
 Endpoint: `http://litellm.litellm.svc:4000/v1`. No cloud providers, no fallbacks (`num_retries: 0`).
+
+Aliases are roles, and they are changed in `config.yaml` through Git (the ConfigMap is hash-suffixed, so Flux rolls the gateway). Repoint an alias instead of adding a new name: each virtual key's model allowlist lives in the database, so a new name would need a manual `/key/update` on every consumer. Do not use the runtime `/model/new` API; it is not in Git.
 
 ## Secrets
 

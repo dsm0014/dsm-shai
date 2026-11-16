@@ -58,7 +58,48 @@ Controlled tests with `llama3.1:8b` (and `mistral-nemo:12b` as a candidate, remo
   - `find` runs, but returns directory abstracts, so it does not surface `profile.md`.
   - An explicit shell task (`ls -S ... > file`) ran through the terminal tool and reported success, but produced no file in 1 of 2 runs. The model did not run the command it was given.
 
-Conclusion: the tool-call format works. The remaining failures are in following multi-step instructions and in argument choice, and they are not fixed by a bigger model in the candidates tested. Hermes is **not** reliably autonomous. Keep the explicit-instruction workarounds in mind for any task.
+Conclusion (superseded by the next section): the earlier read was that the model could not follow multi-step instructions. The follow-up investigation found specific causes, so read "Why Hermes failed" before relying on this one. Hermes is still **not** reliably autonomous on `llama3.1:8b`.
+
+## Why Hermes failed (investigation, 2026-11-16)
+
+Method: capture the real request Hermes sends (`scripts/hermes-capture-proxy.py`), then replay it against any model with `scripts/bench-hermes-tools.py` (8 cases x 5 runs: three plain questions that need no tool, four single tool calls, one two-step task). The request is about 14k tokens: the 7.8k-character system prompt plus 29 tool schemas (about 53k characters). Hermes sends no `temperature`.
+
+| Variant | Plain questions (15) | Tool calls (20) | Two-step (5) | Total (40) |
+|---|---|---|---|---|
+| `llama3.1:8b`, as Hermes runs it | 0 (called a tool every time) | 19 | 2 | 21 |
+| same, `temperature 0.2` | 0 | 20 | 0 | 20 |
+| same, only 10 tools | 0 | 19 | 0 | 19 |
+| `llama3.1:8b` weights, corrected template | 15 | 0 (answered in prose and invented the results) | 5 | 20 |
+| `qwen3:14b`, `reasoning_effort: none` | 15 | 20 | 5 | **40** |
+
+Findings:
+
+1. **The `llama3.1` Ollama template forces a tool call.** With tools present it rewrites the last user message to "respond with a JSON for a function call ... Question: ..." (`ollama show llama3.1:8b --template`). A plain question therefore gets a call to a tool that does not exist (`write`, `text`) or a wrong one (`text_to_speech` for "reply PONG"), and Ollama returns the invented call as message text. Temperature and tool count do not change this.
+2. **Removing the forcing does not fix the model.** With the system-turn template, the same weights stop calling tools and make up the output (a file listing, file contents). The model cannot judge when a tool is needed. This is a model-quality limit, not only a template one.
+3. **The model matters a lot.** `qwen3:14b` passed 40 of 40 on the same replay. It cannot be used because its native context is 40960 and Hermes requires 64,000 (see `deploy/ollama/README.md`). The next step is a model with a native context of at least 64K; candidates and results are recorded below.
+4. **The coding persona was a test artifact.** On a CLI surface in a directory that looks like a code project, Hermes injects "You are a coding agent ... make changes through the tools, not the chat". `kubectl exec ... hermes -z` starts in `/opt/hermes`, which has a `pyproject.toml`, so the earlier README tests ran with that persona. `agent.coding_context: "off"` (now set in `config.yaml`) removes it, verified by capturing the request. The persona explained one failure ("reply PONG" calling the terminal); it did not explain the rest.
+5. **Hermes tunes its prompt by model name, and ours is `chat`.** `TOOL_USE_ENFORCEMENT_MODELS` and the execution-guidance list (`agent/prompt_builder.py`) match substrings such as `qwen`, `gpt`, `gemma`, `mistral`. The LiteLLM alias `chat` matches none, so no model-specific guidance is applied. Not yet tested whether naming the alias after the model changes behaviour.
+6. **Not the cause:** sampling (tested), tool count (tested), the LiteLLM and mesh path (a direct Ollama replay shows the same results), Tool Search (already off).
+
+### Candidates (native context of at least 64K, fits 16 GiB)
+
+`qwen3.5:9b` (256K, vision, tools), `gemma4:12b` (256K), `ministral-3:8b` (256K), `gpt-oss:20b` (128K, about 14 GB, little VRAM left at 64K). `gemma4:12b` and `ministral-3:8b` are downloaded but not yet benchmarked.
+
+**`qwen3.5:9b`** (Ollama 0.40.16, same 8-case replay, 5 runs each):
+
+| `reasoning_effort` sent | Plain (15) | Tool calls (20) | Two-step (5) | Total (40) |
+|---|---|---|---|---|
+| `none` (what `config.yaml` sends today) | 15 | 15 (5 failures) | 5 | 37 |
+| not sent (thinking on, the model default) | 15 | 20 | 5 | **40** |
+| `medium` | 15 | 19 | 5 | 39 |
+
+- **Thinking must stay on.** With `reasoning_effort: none`, Ollama returned HTTP 500 (`XML syntax error ... element <function> closed by </parameter>`) on 4 to 6 of every 10 `read_file` calls: the model writes tool calls as XML, and Ollama's `qwen3.5` parser rejects a malformed one instead of returning it. Qwen's recommended sampling (`temperature 0.7, top_p 0.8, presence_penalty 1.5`) cut that to 2 of 10 but did not remove it. With thinking on, `read_file` succeeded 10 of 10. If this model is adopted, change `agent.reasoning_effort` away from `"none"`.
+- **It fits.** Loaded at `num_ctx 65536` it uses 6.43 GiB (hybrid attention keeps the cache small), 0.31 GiB more for the embedding model; the device was at 9.7 of 16 GiB, about 6.6 GiB free. Native context is 262144, so the 64K floor is not a constraint.
+- **Not yet tested:** real Hermes tasks through LiteLLM with this model (the replay sends Hermes's real request straight to Ollama, so it skips LiteLLM and Hermes's own loop), long multi-step tasks, and the memory-recall flow. Adopting it needs a change to `deploy/litellm/config.yaml` (`chat` alias), the model preload job, and the `reasoning_effort` above.
+
+### After a restart
+
+If Hermes replies with nothing or "waiting for the provider to recover", check mesh enrolment first (`deploy/istio/README.md`, "Restart recovery"). A `rollout restart` of `hermes` is reverted by Flux, so delete the pod.
 
 ## Open items (spec 04)
 
