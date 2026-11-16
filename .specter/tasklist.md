@@ -69,8 +69,11 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: mesh metrics (istiod, ztunnel) ServiceMonitors and a mesh dashboard; LAN-unreachable checks from a second device; the Windows browser check; the HelmRelease changes and new Flux stages land on `main` only after merge.
   - Depends on: 02, 08 part A (gateway), 08 part B (scrape exception documented).
 
-- [ ] **13. Spec 07 part B — Backup and restore.** Schedule restic backups, cover Postgres, Grafana, Hermes, OpenViking and Open WebUI data, and run a restore drill. Record the result.
-  - Depends on: 03, 04, 05, 06, 08, 09 (the data to protect exists).
+- [~] **13. Spec 07 part B — Backup and restore.** Schedule restic backups, cover Postgres, Grafana, Hermes, OpenViking and Open WebUI data, and run a restore drill. Record the result.
+  - Done: restic 0.19.1 (checksum verified) with an encrypted repository on the Windows C: drive, outside the WSL disk; `scripts/backup.sh` quiesces each app, streams its PVC, runs `pg_dump`, and stores the Istio CA, `sops-age` and the age key; retention `7 daily, 4 weekly, 3 monthly` with prune; free-space floor. Scheduled by a systemd user timer (03:30 with a delay; linger enabled), and a systemd-run success is recorded. Drill on 2026-11-16 restored all tags to a staging folder and a scratch Postgres: Hermes config/sessions/skills, OpenViking memory, Open WebUI admin, LiteLLM keys, and the age key decrypting a live Secret. The repo refuses reads without the password.
+  - Open: a full live restore over the running PVCs and a fresh-cluster restore (not done, destructive or needs a second install); the k3s datastore snapshot (needs root); `wsl --export` not run; prune not yet observed (needs about 8 days of snapshots). `scripts/apply-secrets.sh` is tested. The age key copy in `shai-backups/keys.txt` on Windows has permissive mode bits.
+  - Depends on: 03, 04, 05, 06, 08, 09.
+
 - [ ] **14. Index update.** Mark each spec DONE in `specs/00-index.md`, and record the measured footprint and the WSL2 GPU-metric result.
   - Depends on: 1–13.
 
