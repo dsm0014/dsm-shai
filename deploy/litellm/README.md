@@ -57,3 +57,15 @@ Consumer keys (`hermes`, `openviking`, `open-webui`) are issued when their consu
 - Istio AuthorizationPolicy denying direct Ollama access: step 11 (spec 08 part B).
 - Postgres backup and restore: step 13 (spec 07 part B).
 - Secret scan of Git: pending the pre-commit and CI scanning in step 2.
+
+## MCP gateway (spec 09)
+
+Registered on 2026-11-16: the OpenViking MCP server, via `POST /v1/mcp/server` (the registration lives in the LiteLLM database, which is in the restic backup). It is not in `config.yaml`: this LiteLLM release resolves `${NAME}` header values only from database env vars, and a literal header in YAML would put the credential in git.
+
+- **Server:** `openviking`, `http://openviking.openviking.svc:1933/mcp`, transport `http`, auth `api_key`. The credential is the Hermes OpenViking tenant key, so the gateway and Hermes share one memory tenant. A second consumer needs its own server entry with its own tenant key.
+- **Server tool allowlist:** all 31 OpenViking tools (`allowed_tools`). An empty list means no tools, which is how the first registration failed.
+- **Per-key allowlist:** a key reaches a server only if `object_permission.mcp_servers` lists it. Verified: the `hermes` key gets 403 for `openviking` until it is granted, then tools list with status `ok`. Grant with `POST /key/update` and `{"key_alias":"hermes","object_permission":{"mcp_servers":["openviking"]}}`.
+- **Mesh:** `openviking-from-hermes` also allows the LiteLLM identity on port 1933.
+- **Per-server route:** `POST /openviking/mcp` on port 4000. The aggregate `/mcp/` route returned no tools for the master key.
+
+Hermes does **not** use this route yet. Routed through the gateway, the OpenViking tools were deferred behind a bridge, and llama3.1:8b did not call them reliably (recall failed). Hermes uses the direct OpenViking route, which passed recall. Revisit when the model can call deferred tools reliably.

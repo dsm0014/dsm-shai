@@ -77,7 +77,10 @@ spec:
   action: ALLOW
   rules:
     - from:
-        - source: {principals: ["cluster.local/ns/hermes/sa/hermes"]}
+        - source:
+            principals:
+              - "cluster.local/ns/hermes/sa/hermes"
+              - "cluster.local/ns/litellm/sa/default"   # the LiteLLM MCP gateway (spec 09)
       to:
         - operation: {ports: ["1933"]}
 ---
