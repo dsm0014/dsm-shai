@@ -46,6 +46,20 @@ Secrets (SOPS, `deploy/secrets/hermes.sops.yaml`): `litellm-key` (virtual key `h
 - **Tool-argument JSON is sometimes malformed** (`tool_call 'calls' is not valid JSON`). Hermes returns the error to the model, which usually retries. The `remember` call needed an exact-argument prompt. A multi-step `read` after `search` did not complete reliably. Recall worked when the search result itself held the fact.
 - **Memory extraction needs substance.** A one-line `remember` extracted 0 memories (the extraction model is the VLM alias). A two-message submission extracted 1.
 
+## Tool-use investigation (2026-11-16)
+
+Controlled tests with `llama3.1:8b` (and `mistral-nemo:12b` as a candidate, removed afterwards):
+
+- A single tool call, a multi-step answer after a tool result, 40 distractor tools, and a 10k-token system prompt: all 5/5 for llama. Streamed tool calls through LiteLLM: 5/5. So the model, gateway and streaming work in isolation.
+- Hermes sends about 10.7k input tokens per call, and its tools go through Tool Search by default. In Hermes, the bridge calls (`tool_call` wrappers) failed with malformed JSON.
+- With Tool Search off and the OpenViking tools limited to `find`, `remember`, `read` and `list` (`mcp_servers.openviking.tools.include`):
+  - `read` by URI recalled the stored code 3/3, with no tool errors.
+  - `search` failed because the model added a `detail` argument that OpenViking rejects (`detail` requires `mode='context'`).
+  - `find` runs, but returns directory abstracts, so it does not surface `profile.md`.
+  - An explicit shell task (`ls -S ... > file`) ran through the terminal tool and reported success, but produced no file in 1 of 2 runs. The model did not run the command it was given.
+
+Conclusion: the tool-call format works. The remaining failures are in following multi-step instructions and in argument choice, and they are not fixed by a bigger model in the candidates tested. Hermes is **not** reliably autonomous. Keep the explicit-instruction workarounds in mind for any task.
+
 ## Open items (spec 04)
 
 - **Browser MCP tools** (spec 04 and spec 09 `deploy/browser/`): not deployed. Only `hermes` gets browser tools.
