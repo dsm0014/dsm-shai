@@ -64,8 +64,11 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: hostname egress allowlist (REGISTRY_ONLY does not block unregistered hosts in ambient; NetworkPolicy is IP-only). Kiali not checked. Grafana and mesh metrics are step 12.
   - Depends on: 03, 04, 05, 06 part A, 09. Each sub-step is its own commit.
 
-- [ ] **12. Spec 06 part B — Observability complete.** Deploy the DCGM exporter (or the nvidia-smi fallback), the Ollama `/api/ps` exporter, the Grafana route through the gateway (host-local), dashboards provisioned from ConfigMaps, and the PrometheusRule alerts. Run the fire tests.
+- [~] **12. Spec 06 part B — Observability complete.** Deploy the DCGM exporter (or the nvidia-smi fallback), the Ollama `/api/ps` exporter, the Grafana route through the gateway (host-local), dashboards provisioned from ConfigMaps, and the PrometheusRule alerts. Run the fire tests.
+  - Done: nvidia-smi exporter (DCGM not available in this image) with Ollama `/api/ps` loaded-model metrics; GPU memory agrees with host nvidia-smi; two dashboards provisioned from ConfigMaps (Grafana reloaded them); seven alert rules loaded; fire tests firing for VRAM, crash loop and PVC; Prometheus data survives a restart; 15d retention and 20GiB size limit live; no Alertmanager; control-plane scrapes absent; Grafana route through the ingress returns 200; footprint about 1.15 GiB measured.
+  - Open: mesh metrics (istiod, ztunnel) ServiceMonitors and a mesh dashboard; LAN-unreachable checks from a second device; the Windows browser check; the HelmRelease changes and new Flux stages land on `main` only after merge.
   - Depends on: 02, 08 part A (gateway), 08 part B (scrape exception documented).
+
 - [ ] **13. Spec 07 part B — Backup and restore.** Schedule restic backups, cover Postgres, Grafana, Hermes, OpenViking and Open WebUI data, and run a restore drill. Record the result.
   - Depends on: 03, 04, 05, 06, 08, 09 (the data to protect exists).
 - [ ] **14. Index update.** Mark each spec DONE in `specs/00-index.md`, and record the measured footprint and the WSL2 GPU-metric result.

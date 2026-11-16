@@ -21,6 +21,7 @@ spec:
             principals:
               - "cluster.local/ns/litellm/sa/default"
               - "cluster.local/ns/ollama/sa/default"    # the ollama-embed-pin CronJob (same namespace)
+              - "cluster.local/ns/monitoring/sa/gpu-exporter"  # GPU and Ollama metrics exporter (spec 06)
       to:
         - operation: {ports: ["11434"]}
 ---
@@ -119,3 +120,17 @@ spec:
   rules:
     - from:
         - source: {principals: ["cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"]}
+---
+# Grafana is reached only through the host-local ingress gateway (spec 06).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: grafana-from-ingress, namespace: monitoring}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: grafana}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway"]}
+      to:
+        - operation: {ports: ["3000"]}

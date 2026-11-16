@@ -1,0 +1,19 @@
+# Stage "gpu-exporter" (spec 06 part B): nvidia-smi and Ollama metrics exporter. Needs the monitoring CRDs and the nvidia runtime.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gpu-exporter
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/monitoring/gpu-exporter
+  prune: true
+  wait: false
+  timeout: 5m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: monitoring
+    - name: platform
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

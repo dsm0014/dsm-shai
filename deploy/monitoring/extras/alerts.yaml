@@ -1,0 +1,59 @@
+# Alert rules (spec 06). Evaluated by Prometheus; visible in Prometheus and Grafana. No Alertmanager (spec 06).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dsm-shai-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: gpu
+      rules:
+        - alert: GpuVramAbove15GiB
+          expr: max(gpu_memory_used_mib) > 15360
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "VRAM above 15 GiB for 5 minutes"
+            description: "Device VRAM is {{ $value }} MiB. The 16 GiB card is shared by chat, embed and VLM (spec 02)."
+        - alert: GpuTemperatureHigh
+          expr: max(gpu_temperature_celsius) > 83
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "GPU temperature above 83 C"
+            description: "GPU temperature is {{ $value }} C."
+        - alert: OllamaExporterDown
+          expr: max(ollama_up) == 0 or absent(ollama_up)
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Ollama metrics unavailable"
+    - name: host
+      rules:
+        - alert: WslMemoryPressure
+          expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "WSL available memory below 10%"
+            description: "Available memory is {{ $value | humanizePercentage }} of the WSL VM."
+        - alert: NodeOomKill
+          expr: increase(node_vmstat_oom_kill[10m]) > 0
+          labels: {severity: critical}
+          annotations:
+            summary: "OOM kill on the node"
+    - name: storage
+      rules:
+        - alert: PvcUsageAbove85Percent
+          expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} above 85%"
+    - name: stack
+      rules:
+        - alert: PodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"ollama|litellm|openviking|hermes|open-webui|monitoring|istio-system"}[15m]) > 3
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarting"
