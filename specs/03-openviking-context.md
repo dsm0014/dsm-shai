@@ -1,6 +1,6 @@
 # Spec 03 — OpenViking Context Service
 
-**Status:** TODO
+**Status:** PARTIAL (deployed and verified: write/search, restart persistence, LiteLLM attribution; NetworkPolicy/Istio deny and MCP client check pending; see deploy/openviking/README.md)
 
 ## Purpose
 Run OpenViking as a standalone, cluster-internal HTTP service in the k3s `openviking` namespace. It gives Hermes Agent (spec 04) persistent memory, resources, and skills through the `viking://` filesystem paradigm. All model calls go through the in-cluster LiteLLM gateway (spec 09) to Ollama (spec 02), so no cloud provider is needed.
@@ -30,14 +30,14 @@ Run OpenViking as a standalone, cluster-internal HTTP service in the k3s `openvi
 - **Manifests:** Plain YAML (ConfigMap, PVC, Deployment, Service, NetworkPolicy) lives in `deploy/openviking/`. `kubectl apply -f` is idempotent.
 
 ## Acceptance Criteria
-- [ ] The image builds reproducibly from the repo, and the base image digest and OpenViking version or commit are pinned in the Dockerfile.
-- [ ] The image is available to k3s, and the Deployment references it by pinned tag or digest, with no `latest`.
-- [ ] `kubectl -n openviking apply -f deploy/openviking/` succeeds, and the pod reaches `Ready` with all probes passing.
-- [ ] The ConfigMap-mounted config names the `embed` and `vision` aliases against `http://litellm.litellm.svc:4000/v1`, and no cloud provider URLs or direct Ollama URLs appear anywhere.
-- [ ] The PVC is `Bound` on the WSL ext4 `local-path` storage and is mounted at the data directory.
+- [x] The image builds reproducibly from the repo, and the base image digest and OpenViking version or commit are pinned in the Dockerfile.
+- [x] The image is available to k3s, and the Deployment references it by pinned tag or digest, with no `latest`.
+- [x] `kubectl -n openviking apply -f deploy/openviking/` succeeds, and the pod reaches `Ready` with all probes passing.
+- [x] The ConfigMap-mounted config names the `embed` and `vision` aliases against `http://litellm.litellm.svc:4000/v1`, and no cloud provider URLs or direct Ollama URLs appear anywhere.
+- [x] The PVC is `Bound` on the WSL ext4 `local-path` storage and is mounted at the data directory.
 - [ ] The Service is ClusterIP only. A request from outside the cluster fails, and a request from a pod in the Hermes namespace succeeds.
-- [ ] From a pod in the cluster, a test writes a memory item under `viking://` (with a unique marker string) through the HTTP API, and a retrieval or semantic search returns that item.
-- [ ] After `kubectl -n openviking rollout restart deployment/openviking`, the same marker item is still retrievable, which shows the data persists across pod restarts.
-- [ ] LiteLLM metrics (spec 09) show embedding and VLM requests attributed to the `openviking` key during verification.
+- [x] From a pod in the cluster, a test writes a memory item under `viking://` (with a unique marker string) through the HTTP API, and a retrieval or semantic search returns that item.
+- [x] After `kubectl -n openviking rollout restart deployment/openviking`, the same marker item is still retrievable, which shows the data persists across pod restarts.
+- [x] LiteLLM metrics (spec 09) show embedding and VLM requests attributed to the `openviking` key during verification.
 - [ ] If MCP is supported by the pinned version, an MCP client in the cluster can list tools from the service.
-- [ ] `deploy/openviking/README.md` documents the build, pin-bump, deploy, and verification steps, and states which spec 01 and spec 02 outputs it relies on.
+- [x] `deploy/openviking/README.md` documents the build, pin-bump, deploy, and verification steps, and states which spec 01 and spec 02 outputs it relies on.

@@ -1,0 +1,119 @@
+# OpenViking context service (spec 03). Image from the upstream GHCR release, pinned by tag and digest.
+# Runs as UID 1000: the upstream image has no USER, so this is set here (see deploy/openviking/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openviking-data
+  namespace: openviking
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openviking
+  namespace: openviking
+  labels:
+    app.kubernetes.io/name: openviking
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openviking
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openviking
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openviking
+          image: ghcr.io/volcengine/openviking:v0.5.5@sha256:d0d6d5c2dad366b81d970caf420ce186723e539ffc781b80620298675ea5accc
+          ports:
+            - name: http
+              containerPort: 1933
+          env:
+            - name: OPENVIKING_CONFIG_FILE
+              value: /etc/openviking/ov.conf
+            - name: OPENVIKING_LITELLM_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openviking-secrets
+                  key: litellm-key
+            - name: OPENVIKING_ROOT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openviking-secrets
+                  key: root-api-key
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /app/.openviking
+            - name: config
+              mountPath: /etc/openviking
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openviking-data
+        - name: config
+          configMap:
+            name: openviking-config
+---
+# ClusterIP only: no Ingress, NodePort or LoadBalancer. Istio policies (spec 08) restrict callers later.
+apiVersion: v1
+kind: Service
+metadata:
+  name: openviking
+  namespace: openviking
+  labels:
+    app.kubernetes.io/name: openviking
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: openviking
+  ports:
+    - name: http
+      port: 1933
+      targetPort: http

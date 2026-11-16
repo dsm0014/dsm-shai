@@ -43,8 +43,11 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: MCP registration (OpenViking MCP once step 8 lands; browser MCP pod in `deploy/browser/` with its allowlists and non-root/egress checks); "fails fast" when Ollama is down is not met (bounded by the 180s timeout; see deploy/litellm/README.md); the Git secret scan (step 2); Istio deny for direct Ollama access (step 11).
   - Depends on: 02, 07 part A, 08 part A, 06 part A.
 
-- [ ] **8. Spec 03 — OpenViking Context Service.** Deploy OpenViking with `ov.conf` pointing at `http://litellm.litellm.svc:4000/v1`. Issue the `openviking` virtual key.
-  - Depends on: 01, 07 part A, 09 (cycle broken here).
+- [~] **8. Spec 03 — OpenViking Context Service.** Deploy OpenViking with `ov.conf` pointing at `http://litellm.litellm.svc:4000/v1`. Issue the `openviking` virtual key.
+  - Done: upstream image `v0.5.5` pinned by digest (no local build); runs as UID 1000; `/health` and `/ready` pass; `embed` and `vision` through LiteLLM with the `openviking` key (allowlist and budget set); write and semantic find verified, and the marker survives a restart; LiteLLM attributes calls to `openviking`; MCP endpoint loads 27 tools.
+  - Open: NetworkPolicy and Istio ingress limited to `hermes` (step 11); MCP client check from another pod (after LiteLLM MCP registration); read-only root filesystem.
+  - Depends on: 01, 07 part A, 09.
+
 - [ ] **9. Spec 04 — Hermes Agent.** Deploy Hermes with its `hermes` virtual key, the browser MCP tools, and the OpenViking endpoint.
   - Depends on: 02, 03, 08 part A, 09.
 - [ ] **10. Spec 05 — Web UI and Ingress.** Deploy Open WebUI with the `open-webui` virtual key and route it through the ingress gateway (host-local only, per spec 05).
