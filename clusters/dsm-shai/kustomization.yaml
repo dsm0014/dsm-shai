@@ -5,7 +5,7 @@ kind: Kustomization
 resources:
   - flux-system
   - platform.yaml
-  - secrets.yaml
+  - data.yaml
   - monitoring.yaml
   - istio.yaml
   - inference.yaml
