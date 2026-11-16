@@ -1,0 +1,37 @@
+# Post-deploy model preload (spec 02). Idempotent: `ollama pull` skips layers already on the PVC.
+# Pulls by tag (never latest), warms the embedding model pinned resident (keep_alive -1) and the chat model once.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-preload
+  namespace: ollama
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: preload
+          image: docker.io/ollama/ollama:0.40.16
+          env:
+            - name: OLLAMA_HOST
+              value: http://ollama.ollama.svc:11434
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              until ollama list >/dev/null 2>&1; do echo "waiting for ollama"; sleep 5; done
+              for m in qwen3:14b nomic-embed-text:v1.5 qwen2.5vl:3b; do
+                echo "pulling $m"
+                ollama pull "$m"
+              done
+              echo "warming embedding model (pinned resident)"
+              printf '{"model":"nomic-embed-text:v1.5","input":"warmup","keep_alive":-1}' \
+                | wget -qO- --header='Content-Type: application/json' --post-file=- \
+                  http://ollama.ollama.svc:11434/api/embed >/dev/null
+              echo "warming chat model"
+              printf '{"model":"qwen3:14b","prompt":"ok","stream":false,"options":{"num_predict":1}}' \
+                | wget -qO- --header='Content-Type: application/json' --post-file=- \
+                  http://ollama.ollama.svc:11434/api/generate >/dev/null
+              echo "preload complete"

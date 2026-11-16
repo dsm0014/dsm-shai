@@ -1,0 +1,18 @@
+# Stage 4 (spec 08 part A): Istio install only. Namespace enrolment and policy come later (spec 08 part B).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: istio
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/istio
+  prune: true
+  wait: true
+  timeout: 15m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: monitoring
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

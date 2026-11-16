@@ -1,0 +1,14 @@
+# Models survive pod restarts (spec 02). local-path keeps the data on the WSL ext4 volume, not /mnt/c.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: ollama
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 50Gi

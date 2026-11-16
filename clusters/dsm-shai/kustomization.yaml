@@ -1,0 +1,11 @@
+# Entry point for the flux-system Kustomization (path ./clusters/dsm-shai). Stage order follows spec 10:
+# platform -> secrets (data) -> monitoring -> istio -> inference. Each later stage dependsOn the one before it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-system
+  - platform.yaml
+  - secrets.yaml
+  - monitoring.yaml
+  - istio.yaml
+  - inference.yaml

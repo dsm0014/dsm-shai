@@ -1,0 +1,18 @@
+# Stage 5 (spec 02): Ollama inference and its model-pull Job.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: inference
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/ollama
+  prune: true
+  wait: true
+  timeout: 30m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: istio
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

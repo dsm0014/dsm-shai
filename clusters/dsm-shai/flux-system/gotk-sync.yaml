@@ -1,0 +1,31 @@
+# Source and self-sync for Flux. The repo is public, so the Git source uses HTTPS with no
+# secretRef: no token or deploy key is stored in the cluster (spec 10, "Bootstrap and source").
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://github.com/dsm0014/dsm-shai
+  ref:
+    branch: main
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./clusters/dsm-shai
+  prune: true
+  wait: true
+  timeout: 5m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

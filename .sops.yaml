@@ -1,0 +1,6 @@
+# SOPS config (spec 07 / spec 10). Only the public recipient is committed; the private key lives outside the repo.
+# Only data/stringData are encrypted, so metadata stays readable and kustomize-controller can still apply it.
+creation_rules:
+  - path_regex: .*\.sops\.yaml$
+    encrypted_regex: '^(data|stringData)$'
+    age: age1e0quwdhlzj5zdpgvmmf7x26nlt76maazx5dydq3pdcwa0rlycy3qssc98g

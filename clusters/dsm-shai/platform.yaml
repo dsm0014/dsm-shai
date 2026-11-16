@@ -1,0 +1,16 @@
+# Stage 1 (spec 01): namespaces, RuntimeClass nvidia, NVIDIA device plugin.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/platform
+  prune: true
+  wait: true
+  timeout: 10m0s
+  retryInterval: 2m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

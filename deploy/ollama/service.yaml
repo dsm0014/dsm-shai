@@ -1,0 +1,14 @@
+# ClusterIP only: no Ingress or NodePort (spec 02). Only LiteLLM (spec 09) calls it; spec 08 enforces that later.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: ollama
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

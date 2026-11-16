@@ -1,0 +1,149 @@
+# Spec 08 part A: Istio ambient on k3s, installed in order with dependsOn: base -> cni -> istiod -> ztunnel -> gateway.
+# No namespace is enrolled in the mesh yet; that is spec 08 part B.
+# k3s ambient profile per Istio's k3s guidance: profile=ambient and global.platform=k3s on the CNI/control plane.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: istio-base
+  namespace: istio-system
+spec:
+  interval: 1h
+  timeout: 10m
+  chart:
+    spec:
+      chart: base
+      version: 1.30.8 # pinned; bump deliberately, all istio charts together
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: istio-cni
+  namespace: istio-system
+spec:
+  interval: 1h
+  timeout: 10m
+  dependsOn:
+    - name: istio-base
+  chart:
+    spec:
+      chart: cni
+      version: 1.30.8
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    profile: ambient
+    global:
+      platform: k3s
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: istiod
+  namespace: istio-system
+spec:
+  interval: 1h
+  timeout: 10m
+  dependsOn:
+    - name: istio-cni
+  chart:
+    spec:
+      chart: istiod
+      version: 1.30.8
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    profile: ambient
+    global:
+      platform: k3s
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ztunnel
+  namespace: istio-system
+spec:
+  interval: 1h
+  timeout: 10m
+  dependsOn:
+    - name: istiod
+  chart:
+    spec:
+      chart: ztunnel
+      version: 1.30.8
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    profile: ambient
+    global:
+      platform: k3s
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: istio-ingressgateway
+  namespace: istio-system
+spec:
+  interval: 1h
+  timeout: 10m
+  dependsOn:
+    - name: ztunnel
+  chart:
+    spec:
+      chart: gateway
+      version: 1.30.8
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    # Traefik is disabled and this gateway is the single entry point (spec 08). ClusterIP keeps it off the LAN;
+    # spec 05 publishes it host-local.
+    service:
+      type: ClusterIP
