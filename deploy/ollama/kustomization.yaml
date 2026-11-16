@@ -5,3 +5,4 @@ resources:
   - service.yaml
   - deployment.yaml
   - preload-job.yaml
+  - embed-pin-cronjob.yaml

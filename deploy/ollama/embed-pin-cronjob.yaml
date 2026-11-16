@@ -1,0 +1,31 @@
+# Keeps the embedding model resident (spec 02). /v1/embeddings does not accept keep_alive, so any
+# embedding call through the OpenAI-compatible endpoint resets the model to the default 10m keep-alive.
+# This job re-pins it with keep_alive: -1 every 5 minutes. Cost when idle: a tiny embed request.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ollama-embed-pin
+  namespace: ollama
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pin
+              image: docker.io/curlimages/curl:8.10.1
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  curl -sf -m 120 -H 'Content-Type: application/json' \
+                    -d '{"model":"nomic-embed-text:v1.5","input":"pin","keep_alive":-1}' \
+                    http://ollama.ollama.svc:11434/api/embed >/dev/null
+                  echo "embed model pinned"

@@ -34,9 +34,9 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
 - [x] **5. Spec 08 part A — Istio install.** Install istio-base, istio-cni, istiod, ztunnel and the ingress gateway, in that order, with Flux `dependsOn` chains. No namespace enrolment yet.
   - Done: all five releases (1.30.8) Ready in `istio-system`, pods Running, 15 Istio CRDs. Ingress gateway is ClusterIP (host-local; spec 05 publishes it).
   - Depends on: 01, 10, 06 part A (for Istio's ServiceMonitor, not yet added).
-- [~] **6. Spec 02 — Ollama Inference.** Deploy Ollama with the VRAM budget, keep-alive and model pulls (chat, embed, VLM). Verify that models swap within the 16GB budget.
-  - Done: Ollama 0.40.16 on the RTX 4080 (100% GPU, 32k context); three models on a 50Gi PVC; preload Job complete (idempotent: second run with models present); API checks pass (`/v1/models`, `/v1/embeddings`, tool-call response, vision reply); 12.7GiB of 16GiB VRAM in use during a chat load.
-  - Open: 30k-token prompt completes with the model fully on GPU; VLM request evicts chat while embed stays resident (and the reverse) with no OOM; record measured values in the budget table; Service unreachable from outside the cluster (ClusterIP is set; the NetworkPolicy check waits for spec 08 part B).
+- [x] **6. Spec 02 — Ollama Inference.** Deploy Ollama with the VRAM budget, keep-alive and model pulls (chat, embed, VLM). Verify that models swap within the 16GB budget.
+  - Done: Ollama 0.40.16 on the RTX 4080; three models on a 50Gi PVC; preload Job idempotent on rerun; API checks pass (`/v1/models`, `/v1/embeddings`, tool calls, vision); 28,843-token prompt at 32k context fully on GPU; VLM and chat swap with embed resident and no OOM; embed pinned by `ollama-embed-pin` CronJob. Measured values in `deploy/ollama/README.md`.
+  - Open (moved to other steps): `/v1/models` from the `litellm` namespace (step 7); "not reachable from outside the cluster" denial check (step 11, spec 08 part B).
   - Depends on: 01, 07 part A. Enrolment in the mesh happens in step 11.
 - [ ] **7. Spec 09 — LiteLLM Gateway.** Deploy LiteLLM in the `litellm` namespace with Postgres for virtual keys. Route the `chat`, `embed` and `vision` aliases to Ollama. Add the master key, the MCP and browser tool registrations, and the ServiceMonitor. Issue no consumer keys yet.
   - Depends on: 02, 07 part A, 08 part A, 06 part A.
