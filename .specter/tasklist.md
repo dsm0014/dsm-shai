@@ -1,6 +1,6 @@
 # Build Task List: Specs 01–10
 
-**Snapshot:** all specs are `Status: TODO`. Specs 06 and 10 carry uncommitted edits from the 2026-11-15 observability update (kube-prometheus-stack base stage, `monitoring` stage placed before `istio`).
+**Snapshot (2026-11-16):** Steps 1–6 are implemented and reconciled by Flux from `main@0271961`. All six Flux stages (`platform`, `secrets`, `monitoring`, `istio`, `inference`, `flux-system`) report Ready. Steps 7–14 are not started. Legend: `[x]` done, `[~]` partly done (open items listed), `[ ]` not started.
 
 Specs 07, 08 and 06 are split into phases, because their rollout requires the workloads they protect or observe to exist first. Spec 10 delivers everything in-cluster, so its bootstrap comes early.
 
@@ -15,19 +15,28 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
 
 ## Task list
 
-- [ ] **1. Spec 01 — Platform Foundation.** Set `.wslconfig` to 24GB, install k3s with Traefik disabled, configure the NVIDIA runtime and GPU plugin, create the namespaces, and set up the storage class on ext4.
+- [~] **1. Spec 01 — Platform Foundation.** Set `.wslconfig` to 24GB, install k3s with Traefik disabled, configure the NVIDIA runtime and GPU plugin, create the namespaces, and set up the storage class on ext4.
+  - Done: `scripts/30-verify.sh` passes (host, tooling, cluster, GPU, storage, smoke tests).
+  - Open: `wsl --shutdown` restart test (node returns to Ready, GPU smoke test passes); second run of the install scripts confirmed as a no-op; `deploy/README.md` bootstrap order to reflect that Flux now owns `deploy/platform/` (and that `25-platform.sh` skips itself).
   - Depends on: none. Blocks: all.
-- [ ] **2. Spec 10 — GitOps with Flux.** Bootstrap Flux (source, kustomize and helm controllers only), add in-cluster SOPS decryption, and lay out `clusters/dsm-shai/` with the stage Kustomizations.
-  - Depends on: 01.
-  - Note: commit the spec 10 edits first.
-- [ ] **3. Spec 07 part A — Secrets (SOPS + age).** Create the age key and `.sops.yaml`, encrypt the first Secrets, and confirm Flux decrypts them.
+- [~] **2. Spec 10 — GitOps with Flux.** Bootstrap Flux (source, kustomize and helm controllers only), add in-cluster SOPS decryption, and lay out `clusters/dsm-shai/` with the stage Kustomizations.
+  - Done: pinned Flux 2.10.0 components with memory limits at 512Mi; public HTTPS GitRepository with no credential; `scripts/bootstrap-flux.sh` (idempotent); all stage Kustomizations reconciled from `main`.
+  - Open: pre-commit and CI secret scanning (gitleaks, plus a check that every `*.sops.yaml` has a `sops:` block); `flux suspend`/`resume` override test; deliberate-break test (bad Istio value blocks downstream); `git revert` rollback test; measured controller memory recorded; `deploy/flux/README.md`; `docs/restore.md`; `REGISTRY_ONLY` egress allow-list for `flux-system` (after spec 08 part B).
+  - Depends on: 01. Note: `secrets.yaml` is gitignored, so the stage file is `clusters/dsm-shai/data.yaml`.
+- [~] **3. Spec 07 part A — Secrets (SOPS + age).** Create the age key and `.sops.yaml`, encrypt the first Secrets, and confirm Flux decrypts them.
+  - Done: age key at `~/.config/sops/age/keys.txt` with an extra copy in `shai-backups`; `.sops.yaml`; `deploy/secrets/grafana-admin.sops.yaml` encrypted; Flux decrypts it (verified in-cluster).
+  - Open: offline key backup procedure documented; `scripts/apply-secrets.sh` break-glass tool (fails closed without the key, leaves no plaintext on disk); key-rotation workflow; Open WebUI secret when spec 05 lands.
   - Depends on: 01, 10.
-- [ ] **4. Spec 06 part A — Observability base.** Deploy the kube-prometheus-stack HelmRelease: Prometheus Operator, Prometheus with retention and PVC, Grafana with its admin Secret, node-exporter and kube-state-metrics. Alertmanager and control-plane scrapes are disabled.
-  - Depends on: 01, 07 part A (Grafana Secret), 10. Blocks: the ServiceMonitors in steps 5, 7 and 12.
-  - Note: commit the spec 06 edits first.
-- [ ] **5. Spec 08 part A — Istio install.** Install istio-base, istio-cni, istiod, ztunnel and the ingress gateway, in that order, with Flux `dependsOn` chains. No namespace enrolment yet.
-  - Depends on: 01, 10, 06 part A (for Istio's ServiceMonitor).
-- [ ] **6. Spec 02 — Ollama Inference.** Deploy Ollama with the VRAM budget, keep-alive and model pulls (chat, embed, VLM). Verify that models swap within the 16GB budget.
+- [x] **4. Spec 06 part A — Observability base.** Deploy the kube-prometheus-stack HelmRelease: Prometheus Operator, Prometheus with retention and PVC, Grafana with its admin Secret, node-exporter and kube-state-metrics. Alertmanager and control-plane scrapes are disabled.
+  - Done: kube-prometheus-stack 93.3.0 Ready under Flux; Grafana reads `grafana-admin`; CRDs present; Prometheus PVC 30Gi, Grafana PVC 5Gi.
+  - Deviation: node-exporter root-filesystem mount is disabled (WSL2 root mount is not shared; `mount --make-rshared /` needs root). Other node metrics are collected.
+  - Depends on: 01, 07 part A, 10. Blocks: the ServiceMonitors in steps 5, 7 and 12.
+- [x] **5. Spec 08 part A — Istio install.** Install istio-base, istio-cni, istiod, ztunnel and the ingress gateway, in that order, with Flux `dependsOn` chains. No namespace enrolment yet.
+  - Done: all five releases (1.30.8) Ready in `istio-system`, pods Running, 15 Istio CRDs. Ingress gateway is ClusterIP (host-local; spec 05 publishes it).
+  - Depends on: 01, 10, 06 part A (for Istio's ServiceMonitor, not yet added).
+- [~] **6. Spec 02 — Ollama Inference.** Deploy Ollama with the VRAM budget, keep-alive and model pulls (chat, embed, VLM). Verify that models swap within the 16GB budget.
+  - Done: Ollama 0.40.16 on the RTX 4080 (100% GPU, 32k context); three models on a 50Gi PVC; preload Job complete (idempotent: second run with models present); API checks pass (`/v1/models`, `/v1/embeddings`, tool-call response, vision reply); 12.7GiB of 16GiB VRAM in use during a chat load.
+  - Open: 30k-token prompt completes with the model fully on GPU; VLM request evicts chat while embed stays resident (and the reverse) with no OOM; record measured values in the budget table; Service unreachable from outside the cluster (ClusterIP is set; the NetworkPolicy check waits for spec 08 part B).
   - Depends on: 01, 07 part A. Enrolment in the mesh happens in step 11.
 - [ ] **7. Spec 09 — LiteLLM Gateway.** Deploy LiteLLM in the `litellm` namespace with Postgres for virtual keys. Route the `chat`, `embed` and `vision` aliases to Ollama. Add the master key, the MCP and browser tool registrations, and the ServiceMonitor. Issue no consumer keys yet.
   - Depends on: 02, 07 part A, 08 part A, 06 part A.
@@ -49,3 +58,5 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
 ## Verification gates
 
 After each step, the spec's Acceptance Criteria must pass before the next step starts. Each Flux stage must show Ready in `flux get kustomizations` before dependents apply.
+
+Steps 1–6 were brought up through `kubectl`/`helm` where Flux could not yet sync from GitHub, then handed to Flux once `main` carried the stage files. Steps 2–6 are now reconciled by Flux from `main`.
