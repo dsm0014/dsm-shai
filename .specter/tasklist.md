@@ -59,8 +59,11 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Done: Open WebUI v0.13.3 (pinned by digest) as UID 1000; `OPENAI_API_BASE_URL` at LiteLLM with the `open-webui` key (`chat`, `vision`); `ENABLE_SIGNUP=False` (first admin, then 403); SearXNG skipped; PVC persists; Istio `Gateway` and `VirtualService` for `open-webui.localhost`; login, sign-in, models and a chat completion verified through the ingress.
   - Open: mesh deny and egress checks (step 11); LAN and Windows checks; the persistent host listener for the gateway.
   - Depends on: 07 part A, 08 part A, 09.
-- [ ] **11. Spec 08 part B — Mesh enrolment and policy.** Enrol the namespaces in PERMISSIVE mTLS and verify each one. Add ALLOW policies, then default-deny. Switch to STRICT mTLS, with the documented Prometheus scrape exception. Apply REGISTRY_ONLY egress with the Hermes allowlist.
+- [~] **11. Spec 08 part B — Mesh enrolment and policy.** Enrol the namespaces in PERMISSIVE mTLS and verify each one. Add ALLOW policies, then default-deny. Switch to STRICT mTLS, with the documented Prometheus scrape exception. Apply REGISTRY_ONLY egress with the Hermes allowlist.
+  - Done: six namespaces enrolled in ambient; identity ALLOW policies with a deny-all baseline per namespace; mesh-wide STRICT mTLS; rollback drill (PERMISSIVE and back) passed; denied and allowed paths verified (see deploy/istio/README.md); Hermes egress default-deny by NetworkPolicy; measured mesh memory is about 250 Mi.
+  - Open: hostname egress allowlist (REGISTRY_ONLY does not block unregistered hosts in ambient; NetworkPolicy is IP-only). Kiali not checked. Grafana and mesh metrics are step 12.
   - Depends on: 03, 04, 05, 06 part A, 09. Each sub-step is its own commit.
+
 - [ ] **12. Spec 06 part B — Observability complete.** Deploy the DCGM exporter (or the nvidia-smi fallback), the Ollama `/api/ps` exporter, the Grafana route through the gateway (host-local), dashboards provisioned from ConfigMaps, and the PrometheusRule alerts. Run the fire tests.
   - Depends on: 02, 08 part A (gateway), 08 part B (scrape exception documented).
 - [ ] **13. Spec 07 part B — Backup and restore.** Schedule restic backups, cover Postgres, Grafana, Hermes, OpenViking and Open WebUI data, and run a restore drill. Record the result.

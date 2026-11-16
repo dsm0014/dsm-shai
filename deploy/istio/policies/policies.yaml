@@ -1,0 +1,121 @@
+# Identity-based authorization for the mesh (spec 08 part B). Principals are ServiceAccount identities.
+# Each namespace has a deny-all baseline (ALLOW with empty spec); each workload gets explicit ALLOW rules.
+# Ports are L4. Path rules need a waypoint and are not used here.
+
+# ---- ollama: only LiteLLM calls it (spec 02 / 09)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: ollama}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: ollama-from-litellm, namespace: ollama}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: ollama}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/litellm/sa/default"
+              - "cluster.local/ns/ollama/sa/default"    # the ollama-embed-pin CronJob (same namespace)
+      to:
+        - operation: {ports: ["11434"]}
+---
+# ---- litellm: callers are Open WebUI, OpenViking, Hermes and Prometheus; Postgres only from LiteLLM
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: litellm}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: litellm-gateway, namespace: litellm}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: litellm}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/open-webui/sa/default"
+              - "cluster.local/ns/openviking/sa/default"
+              - "cluster.local/ns/hermes/sa/hermes"
+              - "cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"
+      to:
+        - operation: {ports: ["4000"]}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: postgres-from-litellm, namespace: litellm}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: litellm-postgres}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/litellm/sa/default"]}
+      to:
+        - operation: {ports: ["5432"]}
+---
+# ---- openviking: only Hermes calls it
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: openviking}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: openviking-from-hermes, namespace: openviking}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: openviking}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/hermes/sa/hermes"]}
+      to:
+        - operation: {ports: ["1933"]}
+---
+# ---- hermes: no inbound services at all
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: hermes}
+spec: {}
+---
+# ---- open-webui: only the Istio ingress gateway
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: open-webui}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: open-webui-from-ingress, namespace: open-webui}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: open-webui}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway"]}
+      to:
+        - operation: {ports: ["8080"]}
+---
+# ---- monitoring: Prometheus scrapes its targets; nothing else is allowed in
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: monitoring}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: monitoring-from-prometheus, namespace: monitoring}
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"]}

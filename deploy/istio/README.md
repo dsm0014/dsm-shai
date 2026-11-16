@@ -1,0 +1,79 @@
+# deploy/istio
+
+Istio service mesh (spec 08), ambient mode on k3s. Pinned to Istio **1.30.8** (all charts together). Flux installs the charts in order (`helmreleases.yaml`: base, cni, istiod, ztunnel, ingress gateway). Part B (policy, STRICT mTLS, egress) lives in `policies/` and the `mesh-policies` Flux stage.
+
+## Mode decision
+
+Ambient, with no sidecars. Sidecars cost roughly 50 to 100 MB per pod, which does not fit the 24 GB WSL cap alongside a 14B-class model. Waypoints are used only where L7 policy is needed. None is deployed yet.
+
+## WSL2 verification (ambient works on this host)
+
+- k3s CNI paths set through `istio-cni` (k3s profile). `istio-cni-node`, `ztunnel` and `istiod` are Running.
+- Traffic capture: after enrolment, the ztunnel access log shows `src.workload` and `dst` for Prometheus, kube-state-metrics and the LLM traffic. This is the evidence that the pods' traffic is intercepted.
+- Application checks passed after enrolment: Hermes to LiteLLM, LiteLLM to Ollama, Open WebUI through the ingress, OpenViking memory search, Prometheus scraping.
+
+## Memory budget (measured, `kubectl top`)
+
+| Component | Measured | Budget |
+|---|---|---|
+| istiod | 106 Mi | 512 Mi |
+| ztunnel (one node) | 11 Mi | 256 Mi |
+| istio ingress gateway | 66 Mi | 256 Mi |
+| istio-cni node | 63 Mi | n/a (no budget set) |
+| **Total** | **about 250 Mi** | **about 1.5 GB** |
+
+Ollama (chat model at 64K) used about 7.6 GiB of container memory at the time of measurement, within its 12 Gi limit.
+
+## Rollout (as performed, 2026-11-16)
+
+1. Enrol `ollama`, `litellm`, `openviking`, `hermes`, `open-webui`, `monitoring` with `istio.io/dataplane-mode=ambient`. Verified permissive flows still work (namespace labels are now in `deploy/platform/namespaces.yaml`).
+2. Identity-based `AuthorizationPolicy` per workload, with a deny-all baseline per namespace (`policies/policies.yaml`). Principals are ServiceAccounts: LiteLLM to Ollama (plus the embed-pin CronJob), Open WebUI / OpenViking / Hermes / Prometheus to LiteLLM, LiteLLM to Postgres, Hermes to OpenViking, the ingress gateway to Open WebUI, Prometheus to the monitoring namespace.
+3. Mesh-wide `PeerAuthentication` `STRICT` (`policies/mtls.yaml`).
+4. Rollback drill: switched to `PERMISSIVE`, confirmed the flows, restored `STRICT`.
+
+### Verification results
+
+| Check | Result |
+|---|---|
+| Allowed: Hermes to LiteLLM | PONG |
+| Allowed: LiteLLM to Ollama | chat completion |
+| Allowed: Open WebUI to LiteLLM, and the ingress login | 200 |
+| Allowed: Hermes to OpenViking; OpenViking memory search under STRICT | found |
+| Allowed: Prometheus scrapes LiteLLM and the monitoring targets | `up=1`; 12 targets up, 0 down |
+| Denied: Open WebUI to Ollama directly | connection reset |
+| Denied: Hermes to Ollama directly | connection reset |
+| Denied: Hermes to Postgres | connection reset |
+| Denied: plaintext from a non-mesh pod (`default` namespace) to LiteLLM, Ollama and OpenViking | connection reset |
+| Rollback: PERMISSIVE, then STRICT | flows restored |
+
+## Documented exceptions
+
+- **Prometheus operator pod** (`istio.io/dataplane-mode: none`, set in the Helm values `prometheusOperator.podLabels`). The kube-apiserver calls its admission webhook from outside the mesh, so under STRICT those calls would be refused.
+- **node-exporter** is host-networked, so it is not a mesh workload.
+- **kubelet health probes** are allowed by ztunnel; the workloads stay Ready under STRICT.
+
+## Egress: gap and current control
+
+- `outboundTrafficPolicy: REGISTRY_ONLY` is **not applied**. In ambient mode, ztunnel does not enforce it for destinations that are not registered, so it would not block traffic to arbitrary hosts. Measured before the fix: Hermes reached `pypi.org`, `github.com` and `example.com`.
+- The current control is a Kubernetes NetworkPolicy, `deploy/hermes/egress-networkpolicy.yaml`. It allows only DNS, LiteLLM (4000), OpenViking (1933) and the HBONE tunnel (15008). Verified: public hosts are refused, LiteLLM and OpenViking still work, and Hermes still answers.
+- **Not met:** the spec's hostname allowlist (for example `github.com`). NetworkPolicy works at IP level, so hostnames cannot be listed. Options are a waypoint with `ServiceEntry` (heavier, L7) or an allowlist of resolved IP ranges (fragile). This needs a decision.
+
+## Not done
+
+- **Kiali:** not installed (spec says off by default, so this is acceptable). Its "works when enabled" check is not run.
+- **Mesh metrics in Grafana:** ztunnel and istiod metrics are not yet in a Prometheus ServiceMonitor or a dashboard (spec 06 part B, step 12).
+- **Grafana behind the gateway:** not routed. `kubectl port-forward` to mesh workloads is now refused by the deny-all policy, so use `kubectl exec` or a debug container for in-mesh checks.
+
+## Rollback
+
+```sh
+# mTLS back to permissive (keeps policies)
+kubectl -n istio-system patch peerauthentication default --type merge -p '{"spec":{"mtls":{"mode":"PERMISSIVE"}}}'
+# remove a namespace from the mesh
+kubectl label namespace <ns> istio.io/dataplane-mode-
+# remove the policies
+kubectl delete -k deploy/istio/policies
+kubectl delete -f deploy/hermes/egress-networkpolicy.yaml
+```
+
+Note: `kubectl port-forward` is refused for enrolled workloads under the deny-all policy. Use `kubectl exec` for in-cluster checks.
