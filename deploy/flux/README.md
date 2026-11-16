@@ -19,7 +19,7 @@ Each stage is a Flux `Kustomization` in `clusters/dsm-shai/`. A stage applies on
 | `monitoring-extras` | `deploy/monitoring/extras` | monitoring, istio |
 | `gpu-exporter` | `deploy/monitoring/gpu-exporter` | monitoring, platform |
 
-**Not yet on `main`:** `litellm`, `openviking`, `mesh-policies`, `monitoring-extras` and `gpu-exporter` are on the feature branches (see `specs/00-index.md`). Hermes, Open WebUI and the backup have no stage yet. They are applied by hand today and will need stages after the merge.
+All stages are on `main` (PR #7 merged). Hermes and Open WebUI get stages in PR #8. The backup runs from a systemd timer on the WSL host, not from Flux.
 
 ## Secrets
 
@@ -47,9 +47,9 @@ The two tests that need a push to `main` are left for when you decide to merge. 
 
 `flux-system` already has three NetworkPolicies (`allow-egress`, `allow-scraping`, `allow-webhooks`). They are not changed here.
 
-## Suspended stage (2026-11-16)
+## Platform stage
 
-`platform` is **suspended** on purpose. Its manifest on `main` lacks the ambient namespace labels, and Flux would remove them every 10 minutes (see `deploy/istio/README.md`). After `feat/istio-mesh` is merged, run `flux resume kustomization platform`.
+While the mesh labels were missing from `main`, the `platform` stage was suspended. After PR #7 it is resumed and reconciled; the labels come from `deploy/platform/namespaces.yaml`. See `deploy/istio/README.md` for the incident.
 
 ## Operating
 
