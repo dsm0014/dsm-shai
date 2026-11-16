@@ -1,6 +1,6 @@
 # Spec 04 — Hermes Agent
 
-**Status:** TODO
+**Status:** BLOCKED (deployed; gateway running; Hermes refuses the 32k chat model because its minimum context is 64K; see deploy/hermes/README.md)
 
 ## Purpose
 Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`, using in-cluster Ollama (via the LiteLLM gateway, spec 09) for inference and OpenViking as persistent memory, knowledge and skills storage. Hermes runs under tight autonomy boundaries so it can safely write reusable skills from completed tasks. Depends on spec 01 (cluster), spec 02 (inference), spec 03 (OpenViking), spec 08 (Istio mesh and egress control) and spec 09 (LiteLLM gateway).

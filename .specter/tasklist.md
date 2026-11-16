@@ -48,8 +48,12 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: NetworkPolicy and Istio ingress limited to `hermes` (step 11); MCP client check from another pod (after LiteLLM MCP registration); read-only root filesystem.
   - Depends on: 01, 07 part A, 09.
 
-- [ ] **9. Spec 04 — Hermes Agent.** Deploy Hermes with its `hermes` virtual key, the browser MCP tools, and the OpenViking endpoint.
+- [~] **9. Spec 04 — Hermes Agent.** Deploy Hermes with its `hermes` virtual key, the browser MCP tools, and the OpenViking endpoint.
+  - Done: upstream image `v0.23.1` pinned by digest (not built locally; no build daemon here); `hermes` virtual key (chat only); config from ConfigMap; `/opt/data` on a 10Gi PVC; headless `gateway run` up; `hermes doctor` runs.
+  - **Blocked:** Hermes requires at least 64K context. The chat model serves 32K (spec 02 baseline). 64K does not fit the card with `qwen3:14b` (see deploy/hermes/README.md). Needs a decision: model, Hermes floor, or accepted window.
+  - Open: non-root container (upstream s6 init runs as root); OpenViking MCP wiring; browser MCP; the end-to-end task and the cross-session memory check; Istio egress allowlist (step 11).
   - Depends on: 02, 03, 08 part A, 09.
+
 - [ ] **10. Spec 05 — Web UI and Ingress.** Deploy Open WebUI with the `open-webui` virtual key and route it through the ingress gateway (host-local only, per spec 05).
   - Depends on: 07 part A, 08 part A, 09.
 - [ ] **11. Spec 08 part B — Mesh enrolment and policy.** Enrol the namespaces in PERMISSIVE mTLS and verify each one. Add ALLOW policies, then default-deny. Switch to STRICT mTLS, with the documented Prometheus scrape exception. Apply REGISTRY_ONLY egress with the Hermes allowlist.
