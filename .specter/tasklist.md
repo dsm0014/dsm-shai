@@ -74,8 +74,9 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Open: a full live restore over the running PVCs and a fresh-cluster restore (not done, destructive or needs a second install); the k3s datastore snapshot (needs root); `wsl --export` not run; prune not yet observed (needs about 8 days of snapshots). `scripts/apply-secrets.sh` is tested. The age key copy in `shai-backups/keys.txt` on Windows has permissive mode bits.
   - Depends on: 03, 04, 05, 06, 08, 09.
 
-- [ ] **14. Index update.** Mark each spec DONE in `specs/00-index.md`, and record the measured footprint and the WSL2 GPU-metric result.
-  - Depends on: 1–13.
+- [x] **14. Index update.** Mark each spec DONE in `specs/00-index.md`, and record the measured footprint and the WSL2 GPU-metric result.
+  - Done: `specs/00-index.md` shows each spec's real status (DONE for 02 and 03; PARTIAL or IN PROGRESS for the rest, with the open items listed); measured footprint and WSL2 GPU-metric results recorded. Specs 04 to 10 are not DONE: each has open items (see the table).
+  - Depends on: 1 to 13.
 
 ## Verification gates
 

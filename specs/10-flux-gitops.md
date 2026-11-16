@@ -1,6 +1,6 @@
 # Spec 10 — GitOps with Flux
 
-**Status:** TODO
+**Status:** IN PROGRESS (bootstrap and stage Kustomizations reconciled from main; secret scanning, suspend/resume and rollback tests and the deploy README pending)
 
 ## Purpose
 Make the git repo the single source of truth for cluster state by running Flux on the single-node k3s cluster. Flux replaces the hand-run install and apply scripts with ordered, health-gated reconciliation (`dependsOn`), decrypts SOPS secrets in-cluster, and reverts drift. Depends on spec 01 (cluster) and reshapes how specs 02-09 are delivered and how spec 07 handles secrets. Specs 02-09 keep their requirements. Only the delivery mechanism changes.
