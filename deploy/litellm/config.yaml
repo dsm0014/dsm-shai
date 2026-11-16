@@ -1,0 +1,37 @@
+# LiteLLM proxy config (spec 09). Only open-source features. Keys are read from env (LITELLM_MASTER_KEY, DATABASE_URL).
+model_list:
+  - model_name: chat
+    litellm_params:
+      model: ollama_chat/qwen3:14b          # ollama_chat keeps tool-call support
+      api_base: http://ollama.ollama.svc:11434
+      timeout: 180                          # cold swap ~35s + 30k-token prompt ~60s + generation; also bounds an Ollama outage
+      max_parallel_requests: 2              # extra concurrent chat calls get rejected (429) rather than thrash the GPU
+  - model_name: embed
+    litellm_params:
+      model: ollama/nomic-embed-text:v1.5
+      api_base: http://ollama.ollama.svc:11434
+      timeout: 60                           # embeddings are quick; cold load under 1s
+  - model_name: vision
+    litellm_params:
+      model: ollama_chat/qwen2.5vl:3b
+      api_base: http://ollama.ollama.svc:11434
+      timeout: 180
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL     # DB needed for virtual keys, budgets, spend tracking
+
+litellm_settings:
+  num_retries: 0                            # local models only: no silent retries
+  request_timeout: 180
+  drop_params: true
+  turn_off_message_logging: true            # prompt and response content stays out of logs (opt-in only)
+  success_callback: ["prometheus"]          # spec 06 scrapes /metrics
+  failure_callback: ["prometheus"]
+  # In-cluster Prometheus scrapes without a credential. Metrics carry no prompts or keys (hashed key only).
+  # Spec 08 restricts this endpoint to the monitoring namespace.
+  require_auth_for_metrics_endpoint: false
+
+router_settings:
+  num_retries: 0
+  timeout: 180

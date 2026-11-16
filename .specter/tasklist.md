@@ -38,8 +38,11 @@ Specs 07, 08 and 06 are split into phases, because their rollout requires the wo
   - Done: Ollama 0.40.16 on the RTX 4080; three models on a 50Gi PVC; preload Job idempotent on rerun; API checks pass (`/v1/models`, `/v1/embeddings`, tool calls, vision); 28,843-token prompt at 32k context fully on GPU; VLM and chat swap with embed resident and no OOM; embed pinned by `ollama-embed-pin` CronJob. Measured values in `deploy/ollama/README.md`.
   - Open (moved to other steps): `/v1/models` from the `litellm` namespace (step 7); "not reachable from outside the cluster" denial check (step 11, spec 08 part B).
   - Depends on: 01, 07 part A. Enrolment in the mesh happens in step 11.
-- [ ] **7. Spec 09 — LiteLLM Gateway.** Deploy LiteLLM in the `litellm` namespace with Postgres for virtual keys. Route the `chat`, `embed` and `vision` aliases to Ollama. Add the master key, the MCP and browser tool registrations, and the ServiceMonitor. Issue no consumer keys yet.
+- [~] **7. Spec 09 — LiteLLM Gateway.** Deploy LiteLLM in the `litellm` namespace with Postgres for virtual keys. Route the `chat`, `embed` and `vision` aliases to Ollama. Add the master key, the MCP and browser tool registrations, and the ServiceMonitor. Issue no consumer keys yet.
+  - Done: LiteLLM 1.109.1 (pinned tag and digest) and Postgres 16 Ready; `chat`, `embed`, `vision` verified (streaming, tool calls, vision, embeddings); 401 for missing or wrong keys; a key limited to `chat` gets 403 on `embed` and is revoked on delete; concurrency limit (second in-flight call gets 429, no thrash); ServiceMonitor scraped (`up` = 1) with per-key and per-model labels; prompts not logged; SOPS-encrypted master key and DB password.
+  - Open: MCP registration (OpenViking MCP once step 8 lands; browser MCP pod in `deploy/browser/` with its allowlists and non-root/egress checks); "fails fast" when Ollama is down is not met (bounded by the 180s timeout; see deploy/litellm/README.md); the Git secret scan (step 2); Istio deny for direct Ollama access (step 11).
   - Depends on: 02, 07 part A, 08 part A, 06 part A.
+
 - [ ] **8. Spec 03 — OpenViking Context Service.** Deploy OpenViking with `ov.conf` pointing at `http://litellm.litellm.svc:4000/v1`. Issue the `openviking` virtual key.
   - Depends on: 01, 07 part A, 09 (cycle broken here).
 - [ ] **9. Spec 04 — Hermes Agent.** Deploy Hermes with its `hermes` virtual key, the browser MCP tools, and the OpenViking endpoint.

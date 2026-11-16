@@ -1,0 +1,19 @@
+# Stage 6 "litellm" (spec 09): LiteLLM gateway and its Postgres. Needs Ollama (inference) and the mesh (istio) ready first.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: litellm
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/litellm
+  prune: true
+  wait: true
+  timeout: 15m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: inference
+    - name: istio
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
