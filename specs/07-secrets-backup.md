@@ -1,6 +1,6 @@
 # Spec 07 — Secrets Management and Backup/Restore
 
-**Status:** TODO
+**Status:** PARTIAL (SOPS workflow, break-glass apply, restic backup with a systemd timer, and the restore drill are done; the k3s datastore snapshot needs root and is not taken; wsl --export is documented but not run; see docs/restore.md)
 
 ## Purpose
 Define how secrets are stored in git and how irreplaceable cluster state is backed up and restored on the single-node k3s stack. Protect against loss of the WSL ext4 volume, which is a single point of failure for all local-path PVCs. Depends on spec 01 (cluster, storage) and specs 03-06 and 08-09 (the data to protect).

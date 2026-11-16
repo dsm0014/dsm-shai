@@ -1,6 +1,6 @@
 # Spec 08 — Istio Service Mesh
 
-**Status:** TODO
+**Status:** PARTIAL (ambient enrolment, identity policies, STRICT mTLS and rollback verified; hostname egress allowlist not met; see deploy/istio/README.md)
 
 ## Purpose
 Adopt Istio (ambient mode) as the security, routing and egress-control layer of the single-node k3s stack, giving identity-based mTLS and authorization, a single ingress, and hostname-level egress control. It must fit within the ~24GB WSL2 RAM cap shared with a 14B model on one GPU.

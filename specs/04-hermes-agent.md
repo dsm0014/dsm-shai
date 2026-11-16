@@ -1,6 +1,6 @@
 # Spec 04 — Hermes Agent
 
-**Status:** TODO
+**Status:** PARTIAL (running headless and non-root; end-to-end task and OpenViking memory verified; browser MCP, LiteLLM MCP gateway and egress/NetworkPolicy pending; see deploy/hermes/README.md)
 
 ## Purpose
 Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`, using in-cluster Ollama (via the LiteLLM gateway, spec 09) for inference and OpenViking as persistent memory, knowledge and skills storage. Hermes runs under tight autonomy boundaries so it can safely write reusable skills from completed tasks. Depends on spec 01 (cluster), spec 02 (inference), spec 03 (OpenViking), spec 08 (Istio mesh and egress control) and spec 09 (LiteLLM gateway).
@@ -16,7 +16,7 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 **Configuration**
 - `config.yaml` is delivered by a ConfigMap. An init container or entrypoint copies it into `~/.hermes/config.yaml` on each start, so the ConfigMap stays the source of truth.
 - The model provider is a custom OpenAI-compatible endpoint with base URL `http://litellm.litellm.svc:4000/v1` and model alias `chat` (qwen3:14b). Authentication uses the `hermes` LiteLLM virtual key (spec 09), delivered as a SOPS-managed Secret (spec 07).
-- The Hermes context length is set to 32768, matching `OLLAMA_CONTEXT_LENGTH` from spec 02. The ConfigMap comments name that coupling, so a change to one is made to the other.
+- **Amendment (2026-11-16):** the Hermes context length is 65536, matching `OLLAMA_CONTEXT_LENGTH` (raised in spec 02). Hermes refuses any local model below 64K, so the chat model is `llama3.1:8b` (spec 02 amendment). The ConfigMap comments name that coupling, so a change to one is made to the other.
 - OpenViking (`http://openviking.openviking.svc`) is configured as the memory, knowledge and skills backend. It is wired through MCP via the LiteLLM MCP gateway (spec 09) if Hermes supports it, and through the closest supported integration (HTTP tool or skill) otherwise. The chosen path is documented in `deploy/hermes/README.md`.
 
 **Storage**

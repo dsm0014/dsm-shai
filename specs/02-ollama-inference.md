@@ -1,6 +1,8 @@
 # Spec 02 — Ollama Inference
 
-**Status:** TODO
+**Status:** DONE (spec 08 part B NetworkPolicy check and the `litellm` caller check still pending; see deploy/ollama/README.md)
+
+> **Amendment (2026-11-16):** the chat model is `llama3.1:8b` (Q4_K_M, 128K native), not `qwen3:14b`, and `OLLAMA_CONTEXT_LENGTH` is 65536. Reason: Hermes Agent refuses any model below 64K context, and `qwen3:14b` cannot serve 64K on this card (the scheduler shrinks it to 40960 with q8 and q4_0 KV). The VRAM measurements are in deploy/ollama/README.md. The VLM and embedding models are unchanged.
 
 ## Purpose
 Run a single Ollama instance on the k3s cluster as the only local inference endpoint. It serves a tool-calling chat model, an embedding model and a small vision-language model inside the 16GB RTX 4080 VRAM budget. Depends on Spec 01 (platform-foundation) for the cluster, NVIDIA device plugin and namespaces.
@@ -40,14 +42,14 @@ Run a single Ollama instance on the k3s cluster as the only local inference endp
 Chat and VLM together would need about 18.3GiB, which exceeds the card. This is why they swap and are not co-resident. Running the chat model at 64k would add about 2.7GiB of KV cache (q8_0), leaving less than 0.5GiB of headroom in steady state. It is permitted only if measured headroom is at least 0.5GiB.
 
 ## Acceptance Criteria
-- [ ] Namespace `ollama` has one Running pod using `RuntimeClass nvidia`, and `nvidia-smi` inside the pod shows the RTX 4080.
-- [ ] The models PVC is bound on the WSL ext4 volume, and the models are still present after `kubectl delete pod`.
-- [ ] `curl http://ollama.ollama.svc:11434/v1/models` from a pod in the `litellm` namespace lists `qwen3:14b`, `nomic-embed-text` and `qwen2.5vl:3b`.
-- [ ] A `/v1/chat/completions` request with a tool definition to `qwen3:14b` returns a well-formed `tool_calls` response.
-- [ ] A `/v1/embeddings` request to `nomic-embed-text` returns a vector.
-- [ ] A `/v1/chat/completions` request with an image to `qwen2.5vl:3b` returns a description.
-- [ ] A chat request with a prompt of about 30k tokens completes, and `ollama ps` shows the model fully on GPU (100% GPU, no CPU offload) at the configured context.
-- [ ] Peak VRAM during steady state (chat + embed) is at most 15.0GiB. Measured values are recorded in the budget table.
-- [ ] Requesting the VLM while chat is loaded evicts chat and keeps the embedding model resident. The reverse swap also works, and no request fails with an out-of-memory error.
-- [ ] Re-running the preload Job with all models present completes without re-downloading and without errors.
-- [ ] The Service is not reachable from outside the cluster. Once spec 08 is applied, requests from namespaces other than `litellm` are denied.
+- [x] Namespace `ollama` has one Running pod using `RuntimeClass nvidia`, and `nvidia-smi` inside the pod shows the RTX 4080.
+- [x] The models PVC is bound on the WSL ext4 volume, and the models are still present after `kubectl delete pod`.
+- [ ] (waits for spec 09 `litellm` namespace) `curl http://ollama.ollama.svc:11434/v1/models` from a pod in the `litellm` namespace lists `qwen3:14b`, `nomic-embed-text` and `qwen2.5vl:3b`.
+- [x] A `/v1/chat/completions` request with a tool definition to `qwen3:14b` returns a well-formed `tool_calls` response.
+- [x] A `/v1/embeddings` request to `nomic-embed-text` returns a vector.
+- [x] A `/v1/chat/completions` request with an image to `qwen2.5vl:3b` returns a description.
+- [x] A chat request with a prompt of about 30k tokens completes, and `ollama ps` shows the model fully on GPU (100% GPU, no CPU offload) at the configured context.
+- [x] Peak VRAM during steady state (chat + embed) is at most 15.0GiB. Measured values are recorded in the budget table.
+- [x] Requesting the VLM while chat is loaded evicts chat and keeps the embedding model resident. The reverse swap also works, and no request fails with an out-of-memory error.
+- [x] Re-running the preload Job with all models present completes without re-downloading and without errors.
+- [ ] (ClusterIP verified; deny check waits for spec 08 part B) The Service is not reachable from outside the cluster. Once spec 08 is applied, requests from namespaces other than `litellm` are denied.

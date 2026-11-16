@@ -1,0 +1,14 @@
+# Secret hygiene before every commit (spec 10 / spec 07). Install: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: check-sops
+        name: SOPS ciphertext and no plaintext key material
+        entry: scripts/check-sops.sh
+        language: script
+        pass_filenames: false
+        always_run: true

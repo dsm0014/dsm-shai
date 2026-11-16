@@ -1,0 +1,103 @@
+# Hermes Agent (spec 04). Upstream image pinned by tag and digest. Image is not built locally (see README).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hermes
+  namespace: hermes
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-home
+  namespace: hermes
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes
+    spec:
+      serviceAccountName: hermes
+      automountServiceAccountToken: false
+      initContainers:
+        - name: seed-config
+          image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "chown 10000:10000 /opt/data && chmod 0750 /opt/data && cp /config/config.yaml /opt/data/config.yaml && chown 10000:10000 /opt/data/config.yaml && echo seeded"]
+          volumeMounts:
+            - name: home
+              mountPath: /opt/data
+            - name: config
+              mountPath: /config
+              readOnly: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000                       # hermes user in the image
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hermes
+          image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+          imagePullPolicy: IfNotPresent
+          # Skip the s6 /init (root PID 1). The init container has already set ownership and seeded config.
+          command: ["/opt/hermes/docker/main-wrapper.sh"]
+          args: ["gateway", "run"]             # headless: long-lived foreground gateway (recommended for containers)
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: LITELLM_HERMES_KEY          # read via model.key_env in config.yaml
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: litellm-key
+            - name: OPENVIKING_KEY              # ${OPENVIKING_KEY} in mcp_servers headers (config.yaml)
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: openviking-key
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: home
+              mountPath: /opt/data
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: hermes-home
+        - name: config
+          configMap:
+            name: hermes-config
+        - name: workspace
+          emptyDir:
+            sizeLimit: 10Gi

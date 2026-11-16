@@ -9,3 +9,8 @@ resources:
   - monitoring.yaml
   - istio.yaml
   - inference.yaml
+  - litellm.yaml
+  - openviking.yaml
+  - mesh-policies.yaml
+  - monitoring-extras.yaml
+  - gpu-exporter.yaml

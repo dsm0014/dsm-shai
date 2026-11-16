@@ -1,0 +1,19 @@
+# Stage 7 "openviking" (spec 03): context service. Needs LiteLLM for its embed and vision aliases, and its secrets.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: openviking
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/openviking
+  prune: true
+  wait: true
+  timeout: 15m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: litellm
+    - name: secrets
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

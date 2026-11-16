@@ -1,0 +1,11 @@
+# Mesh-wide STRICT mTLS (spec 08 part B). Plaintext in-mesh traffic is refused.
+# Documented exceptions: the Prometheus operator pod is outside the mesh (its admission webhook is called by the
+# kube-apiserver); host-network node-exporter is not a mesh workload; kubelet probes are handled by ztunnel.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT

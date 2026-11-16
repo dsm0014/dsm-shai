@@ -1,0 +1,104 @@
+# LiteLLM proxy (spec 09). ClusterIP only. Admin UI disabled. Image pinned by tag and digest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: litellm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litellm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: litellm
+    spec:
+      containers:
+        - name: litellm
+          image: docker.io/litellm/litellm:1.109.1@sha256:11175975a3093e05e92faee2fe2fe3412a3ae2fcaa849eb0fe25d5f0d8bcb2e9
+          args: ["--config", "/app/config.yaml", "--port", "4000"]
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: master-key
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: db-password
+            - name: DATABASE_URL
+              value: postgresql://litellm:$(DB_PASSWORD)@postgres.litellm.svc:5432/litellm
+            - name: DISABLE_ADMIN_UI
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: litellm   # the ServiceMonitor selects Services by their own labels
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: litellm
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+---
+# Metrics for spec 06 (per-key and per-model labels come from the prometheus callback).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: litellm
+  namespace: litellm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litellm
+  endpoints:
+    - port: http
+      path: /metrics/
+      interval: 30s

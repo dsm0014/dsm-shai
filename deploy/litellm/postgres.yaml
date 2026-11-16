@@ -1,0 +1,76 @@
+# Postgres for LiteLLM virtual keys, budgets and spend (spec 09). Single instance, PVC on WSL ext4 (local-path).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: litellm
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: litellm-postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: pg
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: litellm
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litellm-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: litellm-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
+          ports:
+            - name: pg
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: litellm
+            - name: POSTGRES_USER
+              value: litellm
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: db-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata   # subdirectory: the volume root holds lost+found
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "litellm", "-d", "litellm"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "litellm", "-d", "litellm"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

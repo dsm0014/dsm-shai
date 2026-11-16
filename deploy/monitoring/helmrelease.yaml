@@ -38,9 +38,14 @@ spec:
       enabled: false
     kubeProxy:
       enabled: false
+    prometheusOperator:
+      podLabels:
+        # Spec 08 exception: the kube-apiserver calls this pod's admission webhook from outside the mesh.
+        # Under STRICT mTLS those calls would be refused, so the operator pod stays out of ambient.
+        istio.io/dataplane-mode: none
     prometheus:
       prometheusSpec:
-        retention: 14d
+        retention: 15d
         retentionSize: 20GB
         # Pick up ServiceMonitors and PodMonitors from every namespace, not only the Helm-labelled ones.
         serviceMonitorSelectorNilUsesHelmValues: false
