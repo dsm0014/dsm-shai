@@ -1,5 +1,6 @@
 # Post-deploy model preload (spec 02). Idempotent: `ollama pull` skips layers already on the PVC.
-# Pulls by tag (never latest), warms the embedding model pinned resident (keep_alive -1) and the chat model once.
+# Pulls by tag (never latest) in an init container that uses the ollama CLI. The warm-up requests run in a
+# separate pinned curl container, because the ollama image has neither curl nor wget.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -10,8 +11,8 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      containers:
-        - name: preload
+      initContainers:
+        - name: pull
           image: docker.io/ollama/ollama:0.40.16
           env:
             - name: OLLAMA_HOST
@@ -26,12 +27,20 @@ spec:
                 echo "pulling $m"
                 ollama pull "$m"
               done
+      containers:
+        - name: warm
+          image: docker.io/curlimages/curl:8.10.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
               echo "warming embedding model (pinned resident)"
-              printf '{"model":"nomic-embed-text:v1.5","input":"warmup","keep_alive":-1}' \
-                | wget -qO- --header='Content-Type: application/json' --post-file=- \
-                  http://ollama.ollama.svc:11434/api/embed >/dev/null
+              curl -sf -H 'Content-Type: application/json' \
+                -d '{"model":"nomic-embed-text:v1.5","input":"warmup","keep_alive":-1}' \
+                http://ollama.ollama.svc:11434/api/embed >/dev/null
               echo "warming chat model"
-              printf '{"model":"qwen3:14b","prompt":"ok","stream":false,"options":{"num_predict":1}}' \
-                | wget -qO- --header='Content-Type: application/json' --post-file=- \
-                  http://ollama.ollama.svc:11434/api/generate >/dev/null
+              curl -sf -H 'Content-Type: application/json' \
+                -d '{"model":"qwen3:14b","prompt":"ok","stream":false,"options":{"num_predict":1}}' \
+                http://ollama.ollama.svc:11434/api/generate >/dev/null
               echo "preload complete"
