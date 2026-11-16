@@ -15,3 +15,8 @@ configMapGenerator:
       - dashboards/workloads-node.json
     options:
       labels: {grafana_dashboard: "1"}
+  - name: dsm-dashboard-mesh
+    files:
+      - dashboards/mesh.json
+    options:
+      labels: {grafana_dashboard: "1"}
