@@ -16,7 +16,7 @@ Ambient, with no sidecars. Sidecars cost roughly 50 to 100 MB per pod, which doe
 
 - ztunnel does not re-enrol pods that were already running when it restarted. Their access log shows `connection refused` (HBONE, port 15008) or `connection reset by peer` from the clients, and the pod never logs `pod received, starting proxy`.
 - Fix: delete the affected pods (the Deployment or StatefulSet recreates them, PVCs are kept). Pods that came up after ztunnel are fine. Check with `kubectl -n istio-system logs <ztunnel> | grep "pod received"`.
-- Affected here: `openviking`, `litellm`, `litellm/postgres-0`. Hermes then needs its own restart so its MCP client reconnects; a `rollout restart` is reverted by Flux on the next reconcile, so delete the pod instead.
+- Affected here: `openviking`, `litellm`, `litellm/postgres-0`, `monitoring/prometheus-...-0` (seen again after the PR #9 rollout; Kiali could not reach Prometheus until its pod was recreated). Hermes then needs its own restart so its MCP client reconnects; a `rollout restart` is reverted by Flux on the next reconcile, so delete the pod instead.
 
 ## Memory budget (measured, `kubectl top`)
 
@@ -66,7 +66,7 @@ Ollama (chat model at 64K) used about 7.6 GiB of container memory at the time of
 
 ## Not done
 
-- **Kiali:** not installed (spec says off by default, so this is acceptable). Its "works when enabled" check is not run.
+- **Kiali:** off by default (not in Git). "Works when enabled" checked 2026-11-16: `kiali-server` 2.34.1 in a throwaway namespace enrolled in ambient, anonymous auth, Prometheus at `kube-prometheus-stack-prometheus.monitoring.svc:9090`. Its graph showed 6 workloads and 5 edges across `litellm`, `hermes`, `openviking` and `ollama`. Enabling it needs an `ALLOW` policy for `cluster.local/ns/<kiali-ns>/sa/kiali` to the Prometheus pod on port 9090 (the deny-all baseline resets it otherwise). The test install, namespace and policy were removed afterwards.
 - **Mesh metrics in Grafana:** ztunnel and istiod metrics are not yet in a Prometheus ServiceMonitor or a dashboard (spec 06 part B, step 12).
 - **Grafana behind the gateway:** not routed. `kubectl port-forward` to mesh workloads is now refused by the deny-all policy, so use `kubectl exec` or a debug container for in-mesh checks.
 

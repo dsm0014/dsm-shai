@@ -11,7 +11,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 05 | [Web UI Ingress](./05-web-ui-ingress.md) | PARTIAL | Windows and LAN reachability checks; Open WebUI egress limited to LiteLLM and DNS |
 | 06 | [Observability](./06-observability.md) | PARTIAL | Mesh metrics and dashboard; LAN and Windows checks |
 | 07 | [Secrets Management and Backup/Restore](./07-secrets-backup.md) | PARTIAL | Live and fresh-cluster restore; k3s datastore snapshot (needs root); `wsl --export` not run; prune not yet observed |
-| 08 | [Istio Service Mesh](./08-istio-service-mesh.md) | PARTIAL | Hostname egress allowlist; Kiali check; Grafana and mesh metrics (step 12) |
+| 08 | [Istio Service Mesh](./08-istio-service-mesh.md) | PARTIAL | Hostname egress allowlist; Grafana and mesh metrics (step 12) |
 | 09 | [LiteLLM Gateway](./09-litellm-gateway.md) | PARTIAL | MCP and browser registration; consumer integrations (done for OpenViking, Hermes and Open WebUI); Istio deny (done); fail-fast on Ollama outage (bounded by a 180 s timeout) |
 | 10 | [GitOps with Flux](./10-flux-gitops.md) | PARTIAL | CI secret scan stays inactive (the `workflow` token scope is not added; the pre-commit scan is active); everything else per `.specter/tasklist.md` step 2 |
 
