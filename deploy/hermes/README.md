@@ -23,7 +23,7 @@ Copied to `/opt/data/config.yaml` by the init container on every start. The Conf
 
 - `model`: `provider: custom`, `base_url: http://litellm.litellm.svc:4000/v1`, `default: chat`, `context_length: 65536` (must equal `OLLAMA_CONTEXT_LENGTH`; Hermes's floor is 64K), `key_env: LITELLM_HERMES_KEY`.
 - `agent.reasoning_effort: none`: `llama3.1:8b` has no thinking mode, and Ollama rejects a `think` parameter.
-- `agent.disabled_toolsets: [memory, web]`: OpenViking is the only memory backend. `web` is off because its search and scrape backends are cloud APIs (Parallel, Firecrawl) that need API keys and are refused by the egress proxy; Hermes reads GitHub with `terminal` (`curl`, `git`) through the proxy instead.
+- `agent.disabled_toolsets: [memory, web, browser]`: OpenViking is the only memory backend; `browser` is off because no browser backend is deployed. `terminal.cwd: /workspace` because the image cwd `/opt/hermes` is read-only. `web` is off because its search and scrape backends are cloud APIs (Parallel, Firecrawl) that need API keys and are refused by the egress proxy; Hermes reads GitHub with `terminal` (`curl`, `git`) through the proxy instead.
 - `mcp_servers.openviking`: `http://openviking.openviking.svc:1933/mcp`, header `X-API-Key: ${OPENVIKING_KEY}` (tenant key for account `hermes`).
 
 Secrets (SOPS, `deploy/secrets/hermes.sops.yaml`): `litellm-key` (virtual key `hermes`, allowlist `chat`, budget 20, 60 rpm) and `openviking-key` (tenant user key). Both enter the pod as env vars.

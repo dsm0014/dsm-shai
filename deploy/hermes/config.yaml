@@ -25,7 +25,13 @@ agent:
   coding_context: "off"
   # "web" is off: its search and scrape backends are cloud APIs (Parallel, Firecrawl) that need API keys and are denied by
   # the egress proxy, so every web turn failed. Hermes reaches GitHub with the terminal tool (curl, git) through the proxy.
-  disabled_toolsets: ["memory", "web"]
+  # "browser" is off too: no browser backend is deployed (spec 09 deploy/browser/ is pending), so its tools only error.
+  disabled_toolsets: ["memory", "web", "browser"]
+
+# The image's working directory (/opt/hermes) is read-only, so git clone/checkout there failed. Start in /workspace
+# (emptyDir, writable) instead.
+terminal:
+  cwd: "/workspace"
 
 # OpenViking as memory/knowledge backend over MCP (spec 04). Direct to OpenViking for now: the LiteLLM MCP
 # gateway registration (spec 09) is not yet in place. Key is the tenant user key for account "hermes".
