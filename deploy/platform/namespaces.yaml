@@ -60,3 +60,14 @@ metadata:
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
 
+---
+# Spec 11: the GitHub-only forward proxy for the Hermes nightly job. Enrolled in ambient so the AuthorizationPolicy
+# can restrict callers to the hermes service account.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: egress-proxy
+  labels:
+    istio.io/dataplane-mode: ambient
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

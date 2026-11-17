@@ -15,4 +15,5 @@ resources:
   - monitoring-extras.yaml
   - gpu-exporter.yaml
   - open-webui.yaml
+  - egress.yaml
   - hermes.yaml

@@ -15,6 +15,7 @@ spec:
     - name: litellm
     - name: openviking
     - name: secrets
+    - name: egress
   sourceRef:
     kind: GitRepository
     name: flux-system
