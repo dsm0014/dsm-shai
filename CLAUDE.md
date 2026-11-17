@@ -24,4 +24,5 @@
 
 - Specs live in `specs/`, numbered sequentially (`NN-<slug>.md`) with Status, Purpose, Behavior, Acceptance Criteria. Update `specs/00-index.md` with each new spec.
 - Specs are authored with `/new-spec` (claude-specter) and implemented with `/do-spec`.
+- The task list (`.specter/tasklist.md`) holds only work still to do. When a task list is completed, archive it to `.specter/archive/` as a dated decision log and start the next list from the remaining work only. The new list does not repeat, summarise or link earlier lists; history lives in the archive.
 - Kubernetes manifests are Helm/Kustomize under `deploy/`; scripts under `scripts/`.
