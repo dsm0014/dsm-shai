@@ -111,7 +111,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 | In the pod (read-only ConfigMap `hermes-nightly-specter`) | `/opt/jobs/nightly-specter/` |
 | State: lock, `runs/<date>.json`, `audit.jsonl`, `digest.log`, `metrics.prom` | `/opt/data/nightly-specter/` (PVC) |
 | Clone and scratch | `/workspace/claude-specter`, `/tmp` (lost on restart; an interrupted run is abandoned) |
-| Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_REPO` (owner/name, empty), `IMPL_PROBATION_NIGHTS=7`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
+| Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_REPO` (owner/name, empty), `IMPL_PROBATION_NIGHTS=1`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
 | Token | Secret `hermes-github`, key `token`, env `GITHUB_TOKEN` (optional) |
 | Egress | `deploy/istio/egress/` (Squid, five GitHub hosts) |
 | Metrics and alerts | sidecar on 9101, `deploy/monitoring/extras/nightly-alerts.yaml` |
@@ -133,7 +133,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 
 ### Human override
 
-Merges are **unattended**: no one reads a diff before it reaches `main` of the target repository. Spec-only pull requests merge from night 1; implementation pull requests merge only after `IMPL_PROBATION_NIGHTS` clean nights (default 7; `0` merges from the first night). The owner can stop or undo it at any point:
+Merges are **unattended**: no one reads a diff before it reaches `main` of the target repository. Spec-only pull requests merge from night 1; implementation pull requests merge only after `IMPL_PROBATION_NIGHTS` clean nights in a row (default **1**, the owner's choice so that work keeps progressing if a PR is not reviewed within a day; `0` merges from the first night). In practice the first real Mode A run is the clean night, so later implementation PRs merge on their own. After a failed run or a revert the count is 0 again: the next implementation PR stays open for review and the following night reports `HOLD` until it is merged or closed. The owner can stop or undo it at any point:
 
 - **Stop now:** `hermes pause` (halts cron dispatch and new gateway turns; `hermes resume` lifts it), or `touch /opt/data/nightly-specter/disabled` in the pod, or commit a `.nightly-disabled` file to the target repo's default branch.
 - **Force review:** turn on required reviews in branch protection on the target repo; the merge call then fails and the PR stays open (the next night reports HOLD).
@@ -147,7 +147,7 @@ There is no Alertmanager. `digest.log` (one line per run) is the primary signal;
 
 ### Known limits
 
-The 9B model is the weak link: specs and code it writes are lower quality than Claude Code's, which is why every step is verified by a script and why implementation merges wait for a probation period. `claude-specter`'s own skills do not run in Hermes; the job gives the model their markdown procedure as prompt text. Fetched repository text is untrusted and is wrapped in markers, but a prompt-injection that stays inside the allowed paths would still pass the guard, so read the pull requests.
+The 9B model is the weak link: specs and code it writes are lower quality than Claude Code's, which is why every step is verified by a script and why implementation merges wait for one clean run (and after any failure, for review). `claude-specter`'s own skills do not run in Hermes; the job gives the model their markdown procedure as prompt text. Fetched repository text is untrusted and is wrapped in markers, but a prompt-injection that stays inside the allowed paths would still pass the guard, so read the pull requests.
 
 ## Tool Search and alias naming (replay benchmark, 2026-11-16)
 
