@@ -40,6 +40,8 @@ Built and tested offline: scripts, prompts, 33 local tests, proxy and policy man
 
 ## 5. Proposed, not decided
 
+- [ ] Revisit mesh-native egress (ambient waypoint plus ServiceEntry) instead of Squid when upstream ztunnel can deny unregistered destinations, or when mesh identity and telemetry on egress are wanted. Squid was kept on 2026-11-17; the options and triggers are in `deploy/istio/egress/README.md`.
+
 - [ ] A recovery script that deletes pods ztunnel did not enrol after a restart, so `wsl --shutdown` recovery is not manual. (Seen again on 2026-11-16: `postgres-0`, `openviking`, `prometheus-0`.)
 
 ## Not planned (decided out of scope)
