@@ -1,27 +1,29 @@
 # Task List: Remaining Work
 
-**As of 2026-11-16.** Only work still to do. Legend: `[ ]` not started, `[~]` started. Remove an item when it is done.
+**As of 2026-11-17.** Only work still to do. Legend: `[ ]` not started, `[~]` started. Remove an item when it is done.
 
-## 1. Merge PR #11 and verify
+## 1. Merge the spec 11 implementation PR and verify the rollout
 
-- [ ] Merge PR #11 (task list restart, spec 11). Then confirm Flux has reconciled `hermes` with `readOnlyRootFilesystem` (merged in #10): `kubectl -n hermes get pod`, then `hermes chat -q "..."` in the pod.
+- [ ] Merge the PR. Flux then recreates the hermes pod (new container, `Recreate`), adopts the `hermes-egress` NetworkPolicy, and creates the `egress-proxy` namespace and the Squid proxy.
+- [ ] Delete the hermes pod once (ztunnel does not re-enrol running pods), then check `kubectl -n hermes get pod` is `2/2`, `hermes chat -q "..."` answers, and OpenViking and LiteLLM still work.
+- [ ] Check all Flux stages are Ready, including the new `egress` stage.
 
-## 2. Spec 11: nightly specter improvement (new)
+## 2. Spec 11: nightly specter improvement (built, inert)
 
-Spec: `specs/11-nightly-specter-improvement.md` (Status TODO). Depends on 04, 08, 09, 10.
+Built and tested offline: scripts, prompts, 33 local tests, proxy and policy manifests, alerts, Flux wiring. Open:
 
-- [ ] **Decide the open points:** `IMPL_PROBATION_NIGHTS` (spec default 7, `0` is full auto-merge from night 1); GitHub App token or fine-grained PAT; the exact `claude-specter` repo name and owner; the night window.
-- [ ] **Egress proxy:** Squid pinned by digest in `egress-proxy`, SNI-checked allowlist for the five GitHub hosts in `deploy/istio/egress/`, hermes NetworkPolicy adds `:3128`, AuthorizationPolicy limits the proxy to the hermes service account, `HTTPS_PROXY` on the hermes pod. Negative and positive egress tests.
-- [ ] **Token:** `deploy/secrets/hermes-github.sops.yaml`, added to `deploy/secrets/kustomization.yaml`, delivered as `GITHUB_TOKEN` in the hermes namespace only. Secret scan clean.
-- [ ] **Job scripts** under `deploy/hermes/jobs/nightly-specter/`: `run.sh` (lock, timeout, dry run), `select_mode.py`, `inventory.py`, `dedupe.py`, `guard.py`, `validate`, versioned prompt files, unit tests with fixture repos.
-- [ ] **Status and alerting:** `metrics.prom` and a read-only exporter on 9101, ServiceMonitor, alert rule, digest line, append-only audit log, OpenViking summary.
-- [ ] **Hermes cron entry** (disabled until the rehearsal passes).
-- [ ] **Rehearsal** on a throwaway fork of `claude-specter`: dry run, Mode A (up to 3 specs), Mode B (one implementation PR), forced-failure test, `hermes pause` test, one-PR-per-night test.
-- [ ] **Go live:** point the job at the real repo, enable the cron, document in `deploy/hermes/README.md` (job, override, revert, token rotation and revocation), amend the egress and credential statements in specs 04, 08, 09 and 10, set the spec 11 index row to DONE or PARTIAL.
+- [ ] **Squid proxy first run** (the config and image are unverified; no container runtime was available). Run the checks in `deploy/istio/egress/README.md`, "Verify before use".
+- [ ] **In-pod preflight:** `bash /opt/jobs/nightly-specter/run.sh --preflight`.
+- [ ] **Decide:** the probation default (`IMPL_PROBATION_NIGHTS`, 7 now; `0` is full auto-merge from night 1), token type (fine-grained token or GitHub App), the target repo `owner/name`, the night window.
+- [ ] **Create the token** and the encrypted `deploy/secrets/hermes-github.sops.yaml` (steps in `deploy/hermes/README.md`, "Going live"). Verify the token cannot reach another repo or push to `.github/workflows/`.
+- [ ] **Set `NIGHTLY_REPO`** to a throwaway fork of `claude-specter` first.
+- [ ] **Rehearse on the fork:** dry run, Mode A (up to 3 specs), Mode B (one implementation PR), forced failure, `hermes pause`, one-PR-per-night.
+- [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
+- [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.
 
 ## 3. Open items that need you (not runnable from this session)
 
-- [ ] **Step 1:** the `wsl --shutdown` restart test (stops the whole stack; check that all pods recover, and that pods ztunnel missed are listed in `deploy/istio/README.md`).
+- [ ] **Step 1:** the `wsl --shutdown` restart test (stops the whole stack; check that all pods recover, and note any pod ztunnel missed in `deploy/istio/README.md`).
 - [ ] **Step 1:** second run of the install scripts as a no-op (needs sudo).
 - [ ] **Steps 10 and 12:** LAN-unreachable check for Open WebUI and Grafana from a second device.
 - [ ] **Steps 10 and 12:** Windows browser check for `open-webui.localhost` and Grafana.
@@ -31,17 +33,14 @@ Spec: `specs/11-nightly-specter-improvement.md` (Status TODO). Depends on 04, 08
 - [ ] **Step 13:** `wsl --export`.
 - [ ] **Step 13:** observe a restic prune (needs about eight days of snapshots after 2026-11-16).
 
-## 4. Housekeeping (small, safe to do any time)
+## 4. Housekeeping
 
-- [ ] `specs/04-hermes-agent.md`: the acceptance line still says context 32768 and `qwen3:14b`. The live values are 65536 and `qwen3.5:9b`.
-- [ ] Hermes: retest Tool Search with `qwen3.5:9b` (the `config.yaml` comment says it was only tested with `llama3.1:8b`).
-- [ ] Hermes: test whether naming the LiteLLM alias after the model (so Hermes's model-name prompt tuning applies) changes behaviour (`deploy/hermes/README.md`, point 5).
-- [ ] Benchmark `gemma4:12b` and `ministral-3:8b` (downloaded, not benchmarked) with `scripts/bench-hermes-tools.py`.
+- [ ] Benchmark `gemma4:12b` and `ministral-3:8b` with `scripts/bench-hermes-tools.py` (not on the PVC now; pull first).
+- [ ] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 
 ## 5. Proposed, not decided
 
-- [ ] A recovery script that deletes pods ztunnel did not enrol after a restart, so `wsl --shutdown` recovery is not manual. (Raised after the 2026-11-16 incidents; no decision yet.)
-- [ ] A first Hermes production job (a nightly cluster digest) with a verifier and a failure alert. Spec 11 is the first job in practice, so this may be folded into it.
+- [ ] A recovery script that deletes pods ztunnel did not enrol after a restart, so `wsl --shutdown` recovery is not manual. (Seen again on 2026-11-16: `postgres-0`, `openviking`, `prometheus-0`.)
 
 ## Not planned (decided out of scope)
 

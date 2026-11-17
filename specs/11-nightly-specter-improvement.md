@@ -1,6 +1,6 @@
 # Spec 11 — Nightly Specter Improvement
 
-**Status:** TODO (not started; amends the egress and credential statements of specs 04, 08, 09 and 10 for one job, see "Amended statements")
+**Status:** PARTIAL (job scripts, 33 local tests, proxy and policy manifests, alerts and Flux wiring are built and committed; the token, the proxy's first run, in-pod checks, the fork rehearsal and the cron entry are open; see deploy/hermes/README.md)
 
 ## Purpose
 
@@ -32,8 +32,8 @@ A nightly Hermes job evaluates the user's `claude-specter` repository, compares 
 - Every step is a separate `hermes -z "<exact prompt>"` from a versioned prompt file with numbered instructions and a required output format. After each step a non-LLM verifier checks the artefact: file exists, front matter and Purpose/Behavior/Acceptance Criteria present, `git diff --numstat` within caps and paths, JSON parses, tests exit 0. A failed step is retried once; a second failure aborts the run and discards the branch. Malformed tool-call JSON counts as a failed attempt. Only verifier results count as success.
 
 **Egress (revisits the spec 08 hostname decision for this pod and these hosts only)**
-- The hermes pod gets no direct internet route. A forward proxy (Squid, pinned by digest) in namespace `egress-proxy` is the only workload with internet egress. It allows CONNECT on 443 to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com` and `objects.githubusercontent.com`, using `ssl_bump peek` and `splice` so the TLS SNI must match the allowlist too. Everything else is denied and logged. `REGISTRY_ONLY` and ServiceEntry are not relied on (ztunnel does not enforce them for unregistered hosts, `deploy/istio/README.md`).
-- Hermes egress adds only the proxy on `:3128` to the existing DNS, LiteLLM and OpenViking rules (`deploy/hermes/egress-networkpolicy.yaml`). The proxy is reachable only from the hermes service account. The pod sets `HTTPS_PROXY`, `git config http.proxy` and `NO_PROXY` for `*.svc` and cluster CIDRs. Git uses HTTPS only. The allowlist lives in `deploy/istio/egress/` (the directory spec 08 names; it does not exist yet), minimal and reviewable.
+- The hermes pod gets no direct internet route. A forward proxy (Squid, pinned by digest) in namespace `egress-proxy` is the only workload with internet egress. It allows CONNECT on 443 to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com` and `objects.githubusercontent.com` and nothing else, and logs denials. The allowlist is on the CONNECT target hostname, which works on any Squid build; Squid dials the allowed host itself, so a client that sends another SNI still reaches only GitHub. SNI inspection (`ssl_bump peek` and `splice`) needs an OpenSSL build of Squid, which the pinned Ubuntu image probably is not (GnuTLS), so it is optional and unverified. `REGISTRY_ONLY` and ServiceEntry are not relied on (ztunnel does not enforce them for unregistered hosts, `deploy/istio/README.md`).
+- Hermes egress adds only the proxy on `:3128` to the existing DNS, LiteLLM and OpenViking rules (`deploy/hermes/egress-networkpolicy.yaml`). The proxy is reachable only from the hermes service account. The pod sets `NIGHTLY_HTTPS_PROXY`; the job wrapper exports `HTTPS_PROXY` and `NO_PROXY` (`.svc`, `.cluster.local`) from it, so interactive Hermes is not proxied. No `git config` is written (the home is the PVC); git takes its credential header from environment variables. Git uses HTTPS only. The allowlist lives in `deploy/istio/egress/` (the directory spec 08 names; it does not exist yet), minimal and reviewable.
 
 **Credentials**
 - A fine-grained token (a GitHub App installation token is preferred) limited to the single repository `claude-specter`: Contents read/write, Pull requests read/write, Metadata read. No Administration, no Workflows, 90-day expiry. Stored as `deploy/secrets/hermes-github.sops.yaml` (added to `deploy/secrets/kustomization.yaml`), delivered as env var `GITHUB_TOKEN` through `secretKeyRef` in the hermes namespace only. Never in a ConfigMap, log, prompt or OpenViking; scripts redact `ghp_` and `github_pat_` patterns. Hermes still has no Kubernetes API token.
@@ -61,15 +61,15 @@ A nightly Hermes job evaluates the user's `claude-specter` repository, compares 
 
 ## Acceptance Criteria
 
-- [ ] `select_mode.py` on fixture repos prints B for a repo with an `origin: nightly-improvement` TODO spec, A for one with only DONE or human specs, A when the only TODO spec lacks the origin marker, and HOLD when a `nightly/` PR is open.
-- [ ] `guard.py` exits non-zero with a named reason for a diff outside the allowlist, one over 400 lines or 12 files, one touching `.github/`, and a spec missing a required section or front matter.
-- [ ] From the hermes pod, `https://api.github.com/rate_limit` succeeds through the proxy; `https://example.com` returns 403; direct egress without the proxy times out; a CONNECT to an allowed host with a mismatched SNI is denied; no other pod can use the proxy. The proxy log shows each.
+- [x] `select_mode.py` on fixture repos prints B for a repo with an `origin: nightly-improvement` TODO spec, A for one with only DONE or human specs, A when the only TODO spec lacks the origin marker, and HOLD when a `nightly/` PR is open.
+- [x] `guard.py` exits non-zero with a named reason for a diff outside the allowlist, one over 400 lines or 12 files, one touching `.github/`, and a spec missing a required section or front matter.
+- [ ] From the hermes pod, `https://api.github.com/rate_limit` succeeds through the proxy; `https://example.com` returns 403; direct egress without the proxy times out; a CONNECT to a non-allowlisted host is denied (a mismatched SNI is denied only with an OpenSSL-build Squid); no other pod can use the proxy. The proxy log shows each.
 - [ ] The token cannot read or write any other repository (`gh api repos/<owner>/<other>` returns 403 or 404) and a push under `.github/workflows/` is rejected.
-- [ ] `run.sh --dry-run` produces a draft PR or local patch with a report, merges nothing, and the audit entry has `dry_run: true`.
-- [ ] A second run on the same date opens no PR and logs the one-PR-per-night limit; a concurrent launch logs `skipped: locked` and writes one audit entry.
-- [ ] `hermes pause` before 02:30 results in no run at the next schedule time and `hermes resume` restores it; the `.nightly-disabled` flag also stops a run.
-- [ ] A forced verifier failure leaves nothing merged and the branch discarded, writes an audit entry and a digest line, sets `nightly_specter_last_run_status` to failure, and increments `consecutive_failures`.
-- [ ] `git grep -E 'ghp_|github_pat_'` is clean, `deploy/secrets/hermes-github.sops.yaml` is ciphertext only, the pre-commit secret scan passes, and `kubectl get cm -n hermes -o yaml` contains no token.
-- [ ] With `IMPL_PROBATION_NIGHTS=7` and fewer than 7 clean nights, a Mode B PR stays open and the next night reports HOLD; with `0` it merges.
+- [x] `run.sh --dry-run` produces a draft PR or local patch with a report, merges nothing, and the audit entry has `dry_run: true`.
+- [x] A second run on the same date opens no PR and logs the one-PR-per-night limit; a concurrent launch logs `skipped: locked` and writes one audit entry.
+- [ ] `hermes pause` before 02:30 results in no run at the next schedule time and `hermes resume` restores it; the `.nightly-disabled` flag also stops a run (the flag is tested locally; `hermes pause` is open).
+- [x] A forced verifier failure leaves nothing merged and the branch discarded, writes an audit entry and a digest line, sets `nightly_specter_last_run_status` to failure, and increments `consecutive_failures`.
+- [ ] `git grep -E 'ghp_|github_pat_' -- . ':!*.md'` is clean (checked), `deploy/secrets/hermes-github.sops.yaml` is ciphertext only, the pre-commit secret scan passes, and `kubectl get cm -n hermes -o yaml` contains no token.
+- [x] With `IMPL_PROBATION_NIGHTS=7` and fewer than 7 clean nights, a Mode B PR stays open and the next night reports HOLD; with `0` it merges.
 - [ ] An end-to-end run against a throwaway fork of `claude-specter` completes in Mode A (up to 3 valid specs merged in one spec-only PR) and in Mode B (one implementation PR, tests exit 0, spec Status updated) before the job is pointed at the real repo.
-- [ ] `deploy/hermes/README.md` documents the job, schedule, guardrails, revert procedure, token rotation and revocation, and the amended egress and credential statements in specs 04, 08, 09 and 10; `deploy/istio/egress/` holds the allowlist.
+- [x] `deploy/hermes/README.md` documents the job, schedule, guardrails, revert procedure, token rotation and revocation, and the amended egress and credential statements in specs 04, 08, 09 and 10; `deploy/istio/egress/` holds the allowlist.

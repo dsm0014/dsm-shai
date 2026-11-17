@@ -62,7 +62,7 @@ Ollama (chat model at 64K) used about 7.6 GiB of container memory at the time of
 
 - `outboundTrafficPolicy: REGISTRY_ONLY` is **not applied**. In ambient mode, ztunnel does not enforce it for destinations that are not registered, so it would not block traffic to arbitrary hosts. Measured before the fix: Hermes reached `pypi.org`, `github.com` and `example.com`.
 - The current control is a Kubernetes NetworkPolicy, `deploy/hermes/egress-networkpolicy.yaml`. It allows only DNS, LiteLLM (4000), OpenViking (1933) and the HBONE tunnel (15008). Verified: public hosts are refused, LiteLLM and OpenViking still work, and Hermes still answers.
-- **Not met:** the spec's hostname allowlist (for example `github.com`). NetworkPolicy works at IP level, so hostnames cannot be listed. Options are a waypoint with `ServiceEntry` (heavier, L7) or an allowlist of resolved IP ranges (fragile). This needs a decision.
+- **Not met in general:** the spec's hostname allowlist. NetworkPolicy works at IP level, so hostnames cannot be listed. **One case is handled (spec 11):** the hermes pod reaches five GitHub hosts through a Squid proxy (`deploy/istio/egress/`), restricted to the hermes service account. All other egress stays default-deny.
 
 ## Not done
 

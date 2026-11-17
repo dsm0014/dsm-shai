@@ -2,6 +2,8 @@
 
 **Status:** PARTIAL (running headless and non-root; end-to-end task and OpenViking memory verified; browser MCP, LiteLLM MCP gateway and egress/NetworkPolicy pending; see deploy/hermes/README.md)
 
+> **Amendment (2026-11-17, spec 11):** the nightly specter job (spec 11) may reach five GitHub hosts through a forward proxy in namespace `egress-proxy` (port 3128), and the pod holds an optional repo-scoped `GITHUB_TOKEN`. The default-deny egress and the no-cluster-credentials rule are otherwise unchanged. Interactive Hermes is not proxied.
+
 ## Purpose
 Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`, using in-cluster Ollama (via the LiteLLM gateway, spec 09) for inference and OpenViking as persistent memory, knowledge and skills storage. Hermes runs under tight autonomy boundaries so it can safely write reusable skills from completed tasks. Depends on spec 01 (cluster), spec 02 (inference), spec 03 (OpenViking), spec 08 (Istio mesh and egress control) and spec 09 (LiteLLM gateway).
 

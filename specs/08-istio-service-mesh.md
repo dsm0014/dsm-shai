@@ -2,6 +2,8 @@
 
 **Status:** PARTIAL (ambient enrolment, identity policies, STRICT mTLS and rollback verified; hostname egress allowlist not met; see deploy/istio/README.md)
 
+> **Amendment (2026-11-17, spec 11):** the hostname egress allowlist is implemented for one case only: the hermes pod to five GitHub hosts, through a Squid proxy (`deploy/istio/egress/`), because `REGISTRY_ONLY` is not enforced by ambient ztunnel. Allowed callers of the proxy are limited by an AuthorizationPolicy to `cluster.local/ns/hermes/sa/hermes`. All other egress stays default-deny.
+
 ## Purpose
 Adopt Istio (ambient mode) as the security, routing and egress-control layer of the single-node k3s stack, giving identity-based mTLS and authorization, a single ingress, and hostname-level egress control. It must fit within the ~24GB WSL2 RAM cap shared with a 14B model on one GPU.
 
