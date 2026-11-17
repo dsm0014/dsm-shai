@@ -22,7 +22,15 @@ help: ## List the targets
 
 # ---- cluster -----------------------------------------------------------------------------------------------------
 start: ## Start k3s and wait for the node (needs sudo)
+	@# Docker Desktop mounts a 9p path with a space ("Program Files") at /Docker/host; the unescaped space gives
+	@# /proc/mounts a 7-field line and the kubelet crash-loops ("wrong number of fields"). Unmount it first.
+	@if awk 'NF!=6 {found=1} END {exit !found}' /proc/mounts; then \
+		echo "Unmounting Docker Desktop's /Docker/host (breaks the kubelet's /proc/mounts parsing)"; \
+		sudo umount /Docker/host; \
+	fi
 	sudo systemctl start k3s
+	@echo "Waiting for the API server..."
+	@timeout 180 sh -c 'until kubectl get nodes >/dev/null 2>&1; do sleep 3; done' || { echo "API server did not come up: journalctl -u k3s -n 50"; exit 1; }
 	kubectl wait --for=condition=Ready node --all --timeout=180s
 	@$(MAKE) --no-print-directory status
 	@echo "After a restart, pods ztunnel did not enrol may hang: see deploy/istio/README.md, 'Restart recovery'."
