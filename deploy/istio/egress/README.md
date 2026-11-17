@@ -1,6 +1,6 @@
 # Egress proxy for the Hermes nightly job (spec 11)
 
-The hermes pod has no direct internet route (`deploy/hermes/egress-networkpolicy.yaml`). The nightly job reaches GitHub through a Squid forward proxy in namespace `egress-proxy`, port 3128. Used by the job wrapper only (`NIGHTLY_HTTPS_PROXY`); interactive Hermes is not proxied.
+The hermes pod has no direct internet route (`deploy/hermes/egress-networkpolicy.yaml`). The nightly job reaches GitHub through a Squid forward proxy in namespace `egress-proxy`, port 3128. The container sets `HTTPS_PROXY` (and `NO_PROXY` for cluster hosts), so the job and interactive Hermes both use it; the allowlist is the same for both.
 
 - **Allowlist:** CONNECT on 443 to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`. Everything else gets 403 and is logged. Edit `squid.conf`.
 - **Who may call it:** AuthorizationPolicy `squid-from-hermes` allows only `cluster.local/ns/hermes/sa/hermes` on 3128 (deny-all baseline). The proxy's own egress is limited to DNS and port 443 on public addresses (`squid-egress`).
