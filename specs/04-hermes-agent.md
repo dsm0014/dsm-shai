@@ -17,8 +17,9 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 
 **Configuration**
 - `config.yaml` is delivered by a ConfigMap. An init container or entrypoint copies it into `~/.hermes/config.yaml` on each start, so the ConfigMap stays the source of truth.
-- The model provider is a custom OpenAI-compatible endpoint with base URL `http://litellm.litellm.svc:4000/v1` and model alias `chat` (qwen3:14b). Authentication uses the `hermes` LiteLLM virtual key (spec 09), delivered as a SOPS-managed Secret (spec 07).
-- **Amendment (2026-11-16):** the Hermes context length is 65536, matching `OLLAMA_CONTEXT_LENGTH` (raised in spec 02). Hermes refuses any local model below 64K, so the chat model is `llama3.1:8b` (spec 02 amendment). The ConfigMap comments name that coupling, so a change to one is made to the other.
+- The model provider is a custom OpenAI-compatible endpoint with base URL `http://litellm.litellm.svc:4000/v1` and model alias `chat` (`qwen3.5:9b` since 2026-11-16, see the amendments). Authentication uses the `hermes` LiteLLM virtual key (spec 09), delivered as a SOPS-managed Secret (spec 07).
+- **Amendment (2026-11-16):** the Hermes context length is 65536, matching `OLLAMA_CONTEXT_LENGTH` (raised in spec 02). Hermes refuses any local model below 64K, so the chat model was `llama3.1:8b` (spec 02 amendment). The ConfigMap comments name that coupling, so a change to one is made to the other.
+- **Amendment (2026-11-16, later):** the chat model is `qwen3.5:9b` with `agent.reasoning_effort: medium` (thinking must stay on) and `agent.coding_context: off`. `llama3.1:8b` scored 21/40 on a replay of Hermes's real request because its Ollama template forces a tool call every turn; `qwen3.5:9b` scores 40/40 (`deploy/hermes/README.md`). The container also runs with `readOnlyRootFilesystem` and a `/tmp` emptyDir.
 - OpenViking (`http://openviking.openviking.svc`) is configured as the memory, knowledge and skills backend. It is wired through MCP via the LiteLLM MCP gateway (spec 09) if Hermes supports it, and through the closest supported integration (HTTP tool or skill) otherwise. The chosen path is documented in `deploy/hermes/README.md`.
 
 **Storage**
@@ -45,12 +46,12 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 ## Acceptance Criteria
 - [ ] The image builds from the repo with a pinned Hermes version, and no network fetch of install scripts occurs at runtime.
 - [ ] Pod `hermes` is Running in namespace `hermes`, with `~/.hermes` on a PVC backed by the WSL ext4 volume.
-- [ ] `~/.hermes/config.yaml` matches the ConfigMap and shows the LiteLLM `/v1` URL, the `chat` alias and context length 32768.
+- [ ] `~/.hermes/config.yaml` matches the ConfigMap and shows the LiteLLM `/v1` URL, the `chat` alias and context length 65536.
 - [ ] Deleting the pod preserves `~/.hermes` contents (sessions, skills) after the replacement starts.
 - [ ] `kubectl auth can-i --list` from inside the pod shows no cluster permissions, and no token exists at `/var/run/secrets/kubernetes.io`.
 - [ ] The container runs as a non-root user with no extra capabilities and no `hostPath` volumes, and resource limits are set.
 - [ ] From the pod, LiteLLM, OpenViking and an allowlisted web host are reachable. Ollama directly, an arbitrary non-allowlisted host and the Kubernetes API are not.
-- [ ] An interactive session via `kubectl exec -it` responds using `chat` (qwen3:14b) via LiteLLM.
+- [ ] An interactive session via `kubectl exec -it` responds using `chat` (`qwen3.5:9b`, thinking on) via LiteLLM.
 - [ ] Headless mode keeps running after the exec session disconnects, and `kubectl logs` shows activity.
 - [ ] End-to-end check: a prompt such as "create a file in the workspace listing the 3 largest files in it, then summarize" makes Hermes call a tool and produce the file in the bounded workspace.
 - [ ] After that task, a memory, knowledge or skill item is present in OpenViking. This is confirmed by querying the OpenViking API or CLI from outside the Hermes pod and finding an item attributable to the task.
