@@ -6,7 +6,7 @@
 
 Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
 
-- [ ] **Decide:** the probation default (`IMPL_PROBATION_NIGHTS`, 7 now; `0` is full auto-merge from night 1), token type (fine-grained token or GitHub App), the target repo `owner/name`, the night window.
+- [ ] **Decide:** the night window and the token type are decided or defaulted (fine-grained token; target `dsm0014/claude-specter-auto` for the rehearsal; probation `IMPL_PROBATION_NIGHTS=1`, owner's choice 2026-11-17). Still to confirm: the night window (02:30).
 - [ ] **Create the token** and the encrypted `deploy/secrets/hermes-github.sops.yaml` (steps in `deploy/hermes/README.md`, "Going live"). Verify the token cannot reach another repo or push to `.github/workflows/`.
 - [ ] **Set `NIGHTLY_REPO`** to a throwaway fork of `claude-specter` first.
 - [ ] **Rehearse on the fork:** dry run, Mode A (up to 3 specs), Mode B (one implementation PR), forced failure, `hermes pause`, one-PR-per-night.
@@ -19,7 +19,6 @@ Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, 
 
 ## 3. Open items that need you (not runnable from this session)
 
-- [ ] **Step 1:** the `wsl --shutdown` restart test (stops the whole stack; check that all pods recover, and note any pod ztunnel missed in `deploy/istio/README.md`).
 - [ ] **Step 1:** second run of the install scripts as a no-op (needs sudo).
 - [ ] **Steps 10 and 12:** LAN-unreachable check for Open WebUI and Grafana from a second device.
 - [ ] **Steps 10 and 12:** Windows browser check for `open-webui.localhost` and Grafana.

@@ -12,7 +12,7 @@ import lib, gh_api, select_mode, dedupe, inventory, specutil, guard  # noqa: E40
 
 HERMES = os.environ.get("HERMES_BIN", "hermes")
 STEP_TIMEOUT = int(os.environ.get("NIGHTLY_STEP_TIMEOUT", "600"))
-PROBATION = int(os.environ.get("IMPL_PROBATION_NIGHTS", "7"))
+PROBATION = int(os.environ.get("IMPL_PROBATION_NIGHTS", "1"))
 MAX_REPOS = int(os.environ.get("NIGHTLY_MAX_REPOS", "5"))
 MAX_SPECS = int(os.environ.get("NIGHTLY_MAX_SPECS", "3"))
 QUERIES = [q for q in os.environ.get("NIGHTLY_QUERIES", "claude code skills;spec-driven development;ai coding agent specs").split(";") if q]

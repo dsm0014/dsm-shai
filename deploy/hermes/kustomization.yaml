@@ -33,7 +33,7 @@ configMapGenerator:
     literals:
       - NIGHTLY_REPO=
       - NIGHTLY_TOKEN_TYPE=fine-grained
-      - IMPL_PROBATION_NIGHTS=7
+      - IMPL_PROBATION_NIGHTS=1
       - NIGHTLY_MAX_LINES=400
       - NIGHTLY_MAX_FILES=12
       - NIGHTLY_MAX_REPOS=5

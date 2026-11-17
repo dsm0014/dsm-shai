@@ -49,7 +49,7 @@ A nightly Hermes job evaluates the user's `claude-specter` repository, compares 
 
 **Unattended merging and human override**
 - Merges are unattended: no human reads a diff before it reaches `main`. Overrides: `git revert -m 1 <merge-sha>` on `claude-specter`, `hermes pause`, the `.nightly-disabled` flag, a branch-protection toggle, token revocation.
-- Spec-only PRs auto-merge. Implementation PRs auto-merge only after `IMPL_PROBATION_NIGHTS` consecutive clean nights in the audit log (no failed verifier, no revert); default 7, resets on any failure or revert, and `0` gives full auto-merge from the first night. This default is a recommended safety margin, not a model decision, and the owner may set it to 0.
+- Spec-only PRs auto-merge. Implementation PRs auto-merge only after `IMPL_PROBATION_NIGHTS` consecutive clean nights in the audit log (no failed verifier, no revert); default 1 (owner's choice, 2026-11-17: work keeps progressing if a PR is not reviewed within a day), resets on any failure or revert, and `0` gives full auto-merge from the first night. After a failure or revert the next implementation PR stays open for review, and the next night reports HOLD until it is merged or closed. The value is a configuration choice, not a model decision.
 
 **Limits**
 - 64K context (prompts under 16K, repo content chunked); 2 concurrent LLM calls, so steps run sequentially; the 180 s LiteLLM timeout means long output is split one section per call; `/workspace` is lost on restart, so an interrupted run is abandoned and its branch deleted by the next run. Fetched repo content is untrusted: prompts wrap it in delimiters and the guard stops any resulting out-of-scope diff.
@@ -70,6 +70,6 @@ A nightly Hermes job evaluates the user's `claude-specter` repository, compares 
 - [ ] `hermes pause` before 02:30 results in no run at the next schedule time and `hermes resume` restores it; the `.nightly-disabled` flag also stops a run (the flag is tested locally; `hermes pause` is open).
 - [x] A forced verifier failure leaves nothing merged and the branch discarded, writes an audit entry and a digest line, sets `nightly_specter_last_run_status` to failure, and increments `consecutive_failures`.
 - [ ] `git grep -E 'ghp_|github_pat_' -- . ':!*.md'` is clean (checked), `deploy/secrets/hermes-github.sops.yaml` is ciphertext only, the pre-commit secret scan passes, and `kubectl get cm -n hermes -o yaml` contains no token.
-- [x] With `IMPL_PROBATION_NIGHTS=7` and fewer than 7 clean nights, a Mode B PR stays open and the next night reports HOLD; with `0` it merges.
+- [x] With `IMPL_PROBATION_NIGHTS=1` and no clean night yet (or after a failure), a Mode B PR stays open and the next night reports HOLD; with `0` it merges.
 - [ ] An end-to-end run against a throwaway fork of `claude-specter` completes in Mode A (up to 3 valid specs merged in one spec-only PR) and in Mode B (one implementation PR, tests exit 0, spec Status updated) before the job is pointed at the real repo.
 - [x] `deploy/hermes/README.md` documents the job, schedule, guardrails, revert procedure, token rotation and revocation, and the amended egress and credential statements in specs 04, 08, 09 and 10; `deploy/istio/egress/` holds the allowlist.
