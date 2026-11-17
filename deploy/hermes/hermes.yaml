@@ -94,6 +94,16 @@ spec:
               value: "http://squid.egress-proxy.svc:3128"
             - name: https_proxy
               value: "http://squid.egress-proxy.svc:3128"
+            # git identity and push auth for the terminal tool. The credential helper reads GITHUB_TOKEN at call time, so the
+            # token is never written to disk (HOME is the PVC). There is no gh in the image: PRs go through the REST API (curl).
+            - {name: GIT_AUTHOR_NAME, value: "Hermes (dsm-shai)"}
+            - {name: GIT_COMMITTER_NAME, value: "Hermes (dsm-shai)"}
+            - {name: GIT_AUTHOR_EMAIL, value: "hermes@dsm-shai.invalid"}
+            - {name: GIT_COMMITTER_EMAIL, value: "hermes@dsm-shai.invalid"}
+            - {name: GIT_CONFIG_COUNT, value: "1"}
+            - {name: GIT_CONFIG_KEY_0, value: "credential.https://github.com.helper"}
+            - name: GIT_CONFIG_VALUE_0
+              value: '!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f'
             - name: NO_PROXY
               value: ".svc,.cluster.local,localhost,127.0.0.1,10.42.0.0/16,10.43.0.0/16"
             - name: no_proxy
