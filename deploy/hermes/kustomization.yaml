@@ -3,7 +3,39 @@ kind: Kustomization
 namespace: hermes
 resources:
   - hermes.yaml
+  - egress-networkpolicy.yaml
+  - metrics-service.yaml
 configMapGenerator:
   - name: hermes-config
     files:
       - config.yaml
+  # Spec 11 nightly job: scripts and prompts, mounted read-only at /opt/jobs/nightly-specter. Tests stay out.
+  - name: hermes-nightly-specter
+    files:
+      - run.sh=jobs/nightly-specter/run.sh
+      - orchestrate.py=jobs/nightly-specter/orchestrate.py
+      - lib.py=jobs/nightly-specter/lib.py
+      - select_mode.py=jobs/nightly-specter/select_mode.py
+      - guard.py=jobs/nightly-specter/guard.py
+      - dedupe.py=jobs/nightly-specter/dedupe.py
+      - inventory.py=jobs/nightly-specter/inventory.py
+      - specutil.py=jobs/nightly-specter/specutil.py
+      - gh_api.py=jobs/nightly-specter/gh_api.py
+      - metrics_exporter.py=jobs/nightly-specter/metrics_exporter.py
+      - validate.sh=jobs/nightly-specter/validate.sh
+      - register-cron.sh=jobs/nightly-specter/register-cron.sh
+      - prompt-a-summarise=jobs/nightly-specter/prompts/a-summarise.v1.txt
+      - prompt-a-vectors=jobs/nightly-specter/prompts/a-vectors.v1.txt
+      - prompt-a-spec=jobs/nightly-specter/prompts/a-spec.v1.txt
+      - prompt-b-implement=jobs/nightly-specter/prompts/b-implement.v1.txt
+  # Spec 11 settings. NIGHTLY_REPO is EMPTY on purpose: the job fails closed until the owner sets "owner/name".
+  - name: nightly-specter-env
+    literals:
+      - NIGHTLY_REPO=
+      - NIGHTLY_TOKEN_TYPE=fine-grained
+      - IMPL_PROBATION_NIGHTS=7
+      - NIGHTLY_MAX_LINES=400
+      - NIGHTLY_MAX_FILES=12
+      - NIGHTLY_MAX_REPOS=5
+      - NIGHTLY_MAX_SPECS=3
+      - NIGHTLY_WALL_SECONDS=5400

@@ -80,6 +80,18 @@ spec:
                 secretKeyRef:
                   name: hermes-secrets
                   key: openviking-key
+            - name: GITHUB_TOKEN                # spec 11: optional, so the pod starts without it; the job fails closed
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-github
+                  key: token
+                  optional: true
+            - name: NIGHTLY_HTTPS_PROXY         # the job wrapper exports HTTPS_PROXY from this; interactive Hermes stays un-proxied
+              value: "http://squid.egress-proxy.svc:3128"
+          envFrom:
+            - configMapRef:
+                name: nightly-specter-env       # NIGHTLY_REPO and the job limits; repo is empty until configured
+                optional: true
           resources:
             requests:
               cpu: 500m
@@ -94,6 +106,26 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
+            - name: nightly-jobs
+              mountPath: /opt/jobs/nightly-specter
+              readOnly: true
+        - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
+          image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-I", "/opt/jobs/nightly-specter/metrics_exporter.py"]
+          ports:
+            - {name: metrics, containerPort: 9101}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          volumeMounts:
+            - {name: home, mountPath: /opt/data, readOnly: true}
+            - {name: nightly-jobs, mountPath: /opt/jobs/nightly-specter, readOnly: true}
       volumes:
         - name: home
           persistentVolumeClaim:
@@ -107,3 +139,24 @@ spec:
         - name: tmp                            # Node compile cache, uv locks, runtime scratch
           emptyDir:
             sizeLimit: 1Gi
+        - name: nightly-jobs                   # spec 11 job scripts, read-only; prompts are mapped into prompts/
+          configMap:
+            name: hermes-nightly-specter
+            defaultMode: 0555
+            items:
+              - {key: run.sh, path: run.sh}
+              - {key: orchestrate.py, path: orchestrate.py}
+              - {key: lib.py, path: lib.py}
+              - {key: select_mode.py, path: select_mode.py}
+              - {key: guard.py, path: guard.py}
+              - {key: dedupe.py, path: dedupe.py}
+              - {key: inventory.py, path: inventory.py}
+              - {key: specutil.py, path: specutil.py}
+              - {key: gh_api.py, path: gh_api.py}
+              - {key: metrics_exporter.py, path: metrics_exporter.py}
+              - {key: validate.sh, path: validate.sh}
+              - {key: register-cron.sh, path: register-cron.sh}
+              - {key: prompt-a-summarise, path: prompts/a-summarise.v1.txt}
+              - {key: prompt-a-vectors, path: prompts/a-vectors.v1.txt}
+              - {key: prompt-a-spec, path: prompts/a-spec.v1.txt}
+              - {key: prompt-b-implement, path: prompts/b-implement.v1.txt}

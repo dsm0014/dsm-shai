@@ -101,13 +101,73 @@ Findings:
 
 If Hermes replies with nothing or "waiting for the provider to recover", check mesh enrolment first (`deploy/istio/README.md`, "Restart recovery"). A `rollout restart` of `hermes` is reverted by Flux, so delete the pod.
 
+## Nightly specter job (spec 11)
+
+A nightly job that evaluates the owner's `claude-specter` repository against open-source equivalents on GitHub, then either writes improvement specs (Mode A) or implements one (Mode B), opens a pull request and merges it when the guardrails pass. **It is built but inert:** `NIGHTLY_REPO` is empty, there is no token, and the cron entry is not registered. Until both exist, `run.sh` exits 0 with the audit line `not configured`.
+
+| Part | Where |
+|---|---|
+| Scripts and prompts (source) | `deploy/hermes/jobs/nightly-specter/` |
+| In the pod (read-only ConfigMap `hermes-nightly-specter`) | `/opt/jobs/nightly-specter/` |
+| State: lock, `runs/<date>.json`, `audit.jsonl`, `digest.log`, `metrics.prom` | `/opt/data/nightly-specter/` (PVC) |
+| Clone and scratch | `/workspace/claude-specter`, `/tmp` (lost on restart; an interrupted run is abandoned) |
+| Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_REPO` (owner/name, empty), `IMPL_PROBATION_NIGHTS=7`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
+| Token | Secret `hermes-github`, key `token`, env `GITHUB_TOKEN` (optional) |
+| Egress | `deploy/istio/egress/` (Squid, five GitHub hosts) |
+| Metrics and alerts | sidecar on 9101, `deploy/monitoring/extras/nightly-alerts.yaml` |
+
+**How a run works.** `run.sh` takes a `flock`, checks the configuration and the kill switches, then `orchestrate.py` clones the repo and `select_mode.py` picks the mode (the model never does). Every model call is one `hermes -z` with a versioned prompt and is followed by a script verifier; a step gets two attempts. `guard.py` checks the diff (paths, size, secrets, spec structure) before anything is pushed. The model's own claim of success is not used.
+
+**Tests (offline, no cluster, no network, no model):** `sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh` runs 33 tests with a stub GitHub API, a stub `hermes` and fixture repos.
+
+### Going live (the owner's steps)
+
+1. Create a fine-grained token (or a GitHub App installation token) limited to the single `claude-specter` repository: Contents read/write, Pull requests read/write, Metadata read. No Administration, no Workflows, 90-day expiry.
+2. Encrypt it. Write a `Secret` named `hermes-github` in namespace `hermes` with `stringData.token`, then `sops --encrypt --filename-override deploy/secrets/hermes-github.sops.yaml <file> > deploy/secrets/hermes-github.sops.yaml`, delete the plaintext file, add the new file to `deploy/secrets/kustomization.yaml`, run `bash scripts/check-sops.sh`, commit. Never commit the plaintext.
+3. Set `NIGHTLY_REPO=owner/name` in `deploy/hermes/kustomization.yaml` (`nightly-specter-env`). Point it at a **throwaway fork** first.
+4. After the merge reconciles, delete the hermes pod (a `rollout restart` is reverted by Flux) and check the pod is Ready.
+5. Verify in the pod: `kubectl -n hermes exec deploy/hermes -c hermes -- bash /opt/jobs/nightly-specter/run.sh --preflight` (checks python3, git, flock, curl, timeout, hermes and the state directory; installs nothing). On 2026-11-16 the image had git, curl, flock, timeout and Python 3.14, and no `gh` or `jq` (the job uses the REST API).
+6. Verify the proxy (see `deploy/istio/egress/README.md`, "Verify before use"), then run `bash /opt/jobs/nightly-specter/run.sh --dry-run` and read `audit.jsonl`.
+7. Rehearse on the fork: a dry run, a Mode A run (up to 3 specs), then a Mode B run, the forced-failure case, `hermes pause`, and the one-PR-per-night case.
+8. Register the cron entry **paused**: `sh /opt/jobs/nightly-specter/register-cron.sh` prints the `hermes cron create` command (`--script ... --no-agent --paused`). Check that `--script` accepts a path outside `HERMES_HOME`; if not, copy `run.sh` into the directory Hermes expects. Resume with `hermes cron resume <id>` only after the rehearsal. Point `NIGHTLY_REPO` at the real repository last.
+
+### Human override
+
+Merges are **unattended**: no one reads a diff before it reaches `main` of the target repository. Spec-only pull requests merge from night 1; implementation pull requests merge only after `IMPL_PROBATION_NIGHTS` clean nights (default 7; `0` merges from the first night). The owner can stop or undo it at any point:
+
+- **Stop now:** `hermes pause` (halts cron dispatch and new gateway turns; `hermes resume` lifts it), or `touch /opt/data/nightly-specter/disabled` in the pod, or commit a `.nightly-disabled` file to the target repo's default branch.
+- **Force review:** turn on required reviews in branch protection on the target repo; the merge call then fails and the PR stays open (the next night reports HOLD).
+- **Revert a merge:** `git revert -m 1 <merge-sha>` on the target repo, then `python3 /opt/jobs/nightly-specter/lib.py record-revert "<reason>"` in the pod so the clean-night count resets.
+- **Revoke access:** delete the token in GitHub. The job then fails closed, writes `FAILED` to `digest.log` and the alerts fire.
+- **Rotate:** create the new token, edit the SOPS file, commit, let Flux reconcile, delete the hermes pod, run `--dry-run`, then revoke the old token.
+
+### Alerts
+
+There is no Alertmanager. `digest.log` (one line per run) is the primary signal; the metrics (`nightly_specter_last_success_timestamp`, `nightly_specter_last_run_status`, `nightly_specter_consecutive_failures`) feed Prometheus rules `NightlySpecterStale`, `NightlySpecterLastRunFailed` and `NightlySpecterRepeatedFailures`. `hermes cron incidents` also lists failed cron runs once the entry exists.
+
+### Known limits
+
+The 9B model is the weak link: specs and code it writes are lower quality than Claude Code's, which is why every step is verified by a script and why implementation merges wait for a probation period. `claude-specter`'s own skills do not run in Hermes; the job gives the model their markdown procedure as prompt text. Fetched repository text is untrusted and is wrapped in markers, but a prompt-injection that stays inside the allowed paths would still pass the guard, so read the pull requests.
+
+## Tool Search and alias naming (replay benchmark, 2026-11-16)
+
+Captured one real Hermes request per variant and replayed it against `qwen3.5:9b` (thinking on, 8 cases x 5 runs, `scripts/bench-hermes-tools.py`):
+
+| Variant | Tools sent | Result | Notes |
+|---|---|---|---|
+| Current: alias `chat`, Tool Search off | 29 | 38/40 | `remember` 3/5 (no call, prose) |
+| Model name `qwen3.5:9b` | 29 | 40/40 | Hermes adds about 4.8K characters of tool-use enforcement text for model names it recognises |
+| Tool Search on | 19 | 33/40 | `remember` 0/5, `ls` 3/5; fewer tokens (about 18K characters less) but worse |
+
+Tool Search stays off. Naming the model instead of the alias scored 2 cases higher in one run of 5 (not significant) and changes the system prompt, so it is a candidate to test with a real multi-step task before changing `config.yaml`; it also needs the LiteLLM key allowlist to permit the new name. `gemma4:12b` and `ministral-3:8b` are no longer on the PVC and were not benchmarked.
+
 ## Open items (spec 04)
 
 - **Browser MCP tools** (spec 04 and spec 09 `deploy/browser/`): not deployed. Only `hermes` gets browser tools.
 - **LiteLLM MCP gateway**: Hermes connects to OpenViking's MCP endpoint directly, not through the gateway. Register it with LiteLLM when the gateway's MCP support is set up.
-- **Egress and network policy** (spec 04 and spec 08 part B, step 11): the Kubernetes API server is reachable from the pod's network (TLS verification fails, but a route exists). Istio `REGISTRY_ONLY` and the NetworkPolicy must close that.
+- **Egress and network policy** (spec 04 and spec 08 part B): default-deny by NetworkPolicy; the only added route is the GitHub proxy for the nightly job (spec 11). The hostname allowlist for anything else is not planned.
 - **`readOnlyRootFilesystem`**: on (tested 2026-11-16). The gateway starts, reconnects to OpenViking and answers a chat with only `/opt/data` (PVC), `/workspace` and an `emptyDir` on `/tmp` writable. Writing under `/opt/hermes` fails with "Read-only file system" as intended.
-- **Flux**: the `hermes` Kustomization is not in `clusters/dsm-shai/` yet. It goes in after the branch is merged to `main`.
+- **Flux**: the `hermes` stage is in `clusters/dsm-shai/` and reconciles from `main`. The `hermes-egress` NetworkPolicy is now part of it (it was applied by hand before spec 11).
 
 ## Operation
 

@@ -4,3 +4,6 @@
 secrets.yaml
 *.dec.yaml
 .DS_Store
+
+__pycache__/
+*.pyc

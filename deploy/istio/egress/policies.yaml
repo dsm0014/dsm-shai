@@ -1,0 +1,36 @@
+# Who may use the proxy (spec 11): only the hermes service account, on port 3128. Everything else is denied.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: deny-all, namespace: egress-proxy}
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: squid-from-hermes, namespace: egress-proxy}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: squid}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/hermes/sa/hermes"]}
+      to:
+        - operation: {ports: ["3128"]}
+---
+# The proxy itself may only reach DNS and 443 on the internet. It must not reach cluster services.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: squid-egress, namespace: egress-proxy}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: squid}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports: [{protocol: TCP, port: 443}]

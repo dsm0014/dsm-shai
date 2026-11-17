@@ -1,6 +1,7 @@
 # Default-deny egress for Hermes (spec 04 / spec 08). Allowed: cluster DNS, LiteLLM, OpenViking, and the
 # ambient HBONE tunnel (15008) that carries mesh traffic. Everything else, including the public internet, is refused.
-# Hostname allowlisting is not possible at this layer; see deploy/hermes/README.md.
+# Hostname allowlisting is not possible at this layer; the nightly job (spec 11) reaches GitHub through the proxy in
+# namespace egress-proxy (port 3128), which allows five GitHub hosts only. See deploy/hermes/README.md.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -30,6 +31,11 @@ spec:
             matchLabels: {kubernetes.io/metadata.name: openviking}
       ports:
         - {protocol: TCP, port: 1933}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: egress-proxy}
+      ports:
+        - {protocol: TCP, port: 3128}   # spec 11: the GitHub-only proxy, used by the nightly job only
     - to:
         - ipBlock: {cidr: 0.0.0.0/0}
       ports:

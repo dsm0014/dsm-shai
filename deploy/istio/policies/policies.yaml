@@ -90,6 +90,20 @@ kind: AuthorizationPolicy
 metadata: {name: deny-all, namespace: hermes}
 spec: {}
 ---
+# Spec 11: Prometheus scrapes the nightly job's metrics exporter (port 9101). Nothing else may call the hermes pod.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: hermes-metrics-from-prometheus, namespace: hermes}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: hermes}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"]}
+      to:
+        - operation: {ports: ["9101"]}
+---
 # ---- open-webui: only the Istio ingress gateway
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy

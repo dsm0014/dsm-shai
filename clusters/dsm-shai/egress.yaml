@@ -1,0 +1,20 @@
+# Stage "egress" (spec 11): the GitHub-only forward proxy for the Hermes nightly job. Needs the mesh CRDs and the
+# egress-proxy namespace (platform).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: egress
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./deploy/istio/egress
+  prune: true
+  wait: false
+  timeout: 5m0s
+  retryInterval: 2m0s
+  dependsOn:
+    - name: platform
+    - name: istio
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

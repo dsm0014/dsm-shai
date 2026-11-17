@@ -2,6 +2,8 @@
 
 **Status:** IN PROGRESS (bootstrap and stage Kustomizations reconciled from main; secret scanning, suspend/resume and rollback tests and the deploy README pending)
 
+> **Amendment (2026-11-17, spec 11):** "no write token in the cluster" and "nothing else gains the Git host egress" apply to Flux and `dsm-shai`. They are amended for one secret: `deploy/secrets/hermes-github.sops.yaml` (ciphertext in Git, decrypted by the `secrets` stage) puts a fine-grained token scoped to the single `claude-specter` repository in the hermes namespace, and the hermes pod reaches GitHub through the proxy. Flux still reads `dsm-shai` without credentials.
+
 ## Purpose
 Make the git repo the single source of truth for cluster state by running Flux on the single-node k3s cluster. Flux replaces the hand-run install and apply scripts with ordered, health-gated reconciliation (`dependsOn`), decrypts SOPS secrets in-cluster, and reverts drift. Depends on spec 01 (cluster) and reshapes how specs 02-09 are delivered and how spec 07 handles secrets. Specs 02-09 keep their requirements. Only the delivery mechanism changes.
 

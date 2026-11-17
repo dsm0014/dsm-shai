@@ -1,0 +1,43 @@
+# Alerts for the Hermes nightly specter job (spec 11). The metrics come from the read-only exporter on port 9101 in the
+# hermes pod (Service hermes-metrics). There is no Alertmanager: the daily digest line is the primary alert, these rules
+# are for Prometheus and Grafana.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hermes-nightly
+  namespace: monitoring
+spec:
+  namespaceSelector: {matchNames: [hermes]}
+  selector:
+    matchLabels: {app.kubernetes.io/name: hermes-metrics}
+  endpoints:
+    - {port: metrics, path: /metrics, interval: 60s}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nightly-specter
+  namespace: monitoring
+spec:
+  groups:
+    - name: nightly-specter
+      rules:
+        - alert: NightlySpecterStale
+          expr: time() - nightly_specter_last_success_timestamp > 36 * 3600
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "Nightly specter job has not succeeded for 36 hours"
+            description: "Check /opt/data/nightly-specter/digest.log and audit.jsonl in the hermes pod."
+        - alert: NightlySpecterLastRunFailed
+          expr: nightly_specter_last_run_status == 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Last nightly specter run failed"
+        - alert: NightlySpecterRepeatedFailures
+          expr: nightly_specter_consecutive_failures >= 2
+          labels: {severity: critical}
+          annotations:
+            summary: "Nightly specter job failed {{ $value }} nights in a row"
+            description: "Run `hermes pause` if it keeps writing to the target repository."
