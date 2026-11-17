@@ -4,11 +4,8 @@
 
 ## 1. Spec 11: nightly specter improvement (built, merged, running inert)
 
-Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
+Token and rehearsal repo done 2026-11-17: fine-grained token for `dsm0014/claude-specter-auto` only (verified: cannot see the private `claude-specter`, cannot push workflow files, cannot change settings), stored as `deploy/secrets/hermes-github.sops.yaml`; `NIGHTLY_REPO=dsm0014/claude-specter-auto`; probation 1; token expires 2027-02-14. Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
 
-- [ ] **Decide:** the night window and the token type are decided or defaulted (fine-grained token; target `dsm0014/claude-specter-auto` for the rehearsal; probation `IMPL_PROBATION_NIGHTS=1`, owner's choice 2026-11-17). Still to confirm: the night window (02:30).
-- [ ] **Create the token** and the encrypted `deploy/secrets/hermes-github.sops.yaml` (steps in `deploy/hermes/README.md`, "Going live"). Verify the token cannot reach another repo or push to `.github/workflows/`.
-- [ ] **Set `NIGHTLY_REPO`** to a throwaway fork of `claude-specter` first.
 - [ ] **Rehearse on the fork:** dry run, Mode A (up to 3 specs), Mode B (one implementation PR), forced failure, `hermes pause`, one-PR-per-night.
 - [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.

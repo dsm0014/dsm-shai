@@ -111,7 +111,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 | In the pod (read-only ConfigMap `hermes-nightly-specter`) | `/opt/jobs/nightly-specter/` |
 | State: lock, `runs/<date>.json`, `audit.jsonl`, `digest.log`, `metrics.prom` | `/opt/data/nightly-specter/` (PVC) |
 | Clone and scratch | `/workspace/claude-specter`, `/tmp` (lost on restart; an interrupted run is abandoned) |
-| Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_REPO` (owner/name, empty), `IMPL_PROBATION_NIGHTS=1`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
+| Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_REPO` (owner/name; `dsm0014/claude-specter-auto`, the private rehearsal copy, until the real repo is switched in), `IMPL_PROBATION_NIGHTS=1`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
 | Token | Secret `hermes-github`, key `token`, env `GITHUB_TOKEN` (optional) |
 | Egress | `deploy/istio/egress/` (Squid, five GitHub hosts) |
 | Metrics and alerts | sidecar on 9101, `deploy/monitoring/extras/nightly-alerts.yaml` |

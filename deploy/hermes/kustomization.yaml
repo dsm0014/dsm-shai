@@ -28,10 +28,11 @@ configMapGenerator:
       - prompt-a-vectors=jobs/nightly-specter/prompts/a-vectors.v1.txt
       - prompt-a-spec=jobs/nightly-specter/prompts/a-spec.v1.txt
       - prompt-b-implement=jobs/nightly-specter/prompts/b-implement.v1.txt
-  # Spec 11 settings. NIGHTLY_REPO is EMPTY on purpose: the job fails closed until the owner sets "owner/name".
+  # Spec 11 settings. The job fails closed while NIGHTLY_REPO is empty or the token is missing. It points at the
+  # private rehearsal copy dsm0014/claude-specter-auto; switch to the real repo only after the rehearsal passes.
   - name: nightly-specter-env
     literals:
-      - NIGHTLY_REPO=
+      - NIGHTLY_REPO=dsm0014/claude-specter-auto
       - NIGHTLY_TOKEN_TYPE=fine-grained
       - IMPL_PROBATION_NIGHTS=1
       - NIGHTLY_MAX_LINES=400
