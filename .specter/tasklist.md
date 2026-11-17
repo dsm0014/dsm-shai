@@ -2,19 +2,23 @@
 
 **As of 2026-11-17 (after the spec 11 merge).** Only work still to do. Legend: `[ ]` not started, `[~]` started. Remove an item when it is done.
 
+## 0. First, after the cluster is started again
+
+The cluster was shut down on 2026-11-17 with everything merged to `main` (Flux at `e876795`). Persistent: the Hermes volume (`/opt/data`: audit log, digest, state), all PVCs, the SOPS secrets in Git. Lost on restart: `/workspace` in the Hermes pod (the dry-run clone and branches; they were never pushed).
+
+- [ ] `make start`, then `make status` (all 13 Flux stages Ready, no stuck pods).
+- [ ] Pods ztunnel did not enrol after a restart hang or refuse connections (`connection refused` on port 15008). Delete them, as `deploy/istio/README.md`, "Restart recovery", describes. Likely ones: `postgres-0`, `litellm`, `openviking`, `prometheus-0`, `squid`, then `hermes` last.
+- [ ] `make nightly-preflight`, and check `make hermes-task TASK="Reply with the single word: pong"` answers.
+
 ## 1. Spec 11: nightly specter improvement (built, merged, running inert)
 
 Token and rehearsal repo done 2026-11-17: fine-grained token for `dsm0014/claude-specter-auto` only (verified: cannot see the private `claude-specter`, cannot push workflow files, cannot change settings), stored as `deploy/secrets/hermes-github.sops.yaml`; `NIGHTLY_REPO=dsm0014/claude-specter-auto`; probation 1; token expires 2027-02-14. Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
 
-- [~] **Rehearse on the fork** (`dsm0014/claude-specter-auto`): the first dry run passed on 2026-11-17 (Mode A, 79 s, 3 specs, nothing pushed) and found two bugs, now fixed (index rows must match the table's column count; bare file paths in `## Files` are normalised). The model's specs were well-formed but of mixed quality (for example a vague multi-language docs spec). Still to do: a second dry run to confirm the fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
+- [~] **Rehearse on the fork** (`dsm0014/claude-specter-auto`): the first dry run passed on 2026-11-17 (Mode A, 79 s, 3 specs, nothing pushed) and found two bugs, now fixed (index rows must match the table's column count; bare file paths in `## Files` are normalised). The model's specs were well-formed but of mixed quality (for example a vague multi-language docs spec). The second dry run on the fixed code also passed (101 s, 3 specs, 3-cell index rows, backticked Files, two verifier retries recovered). Still to do: a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
 - [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.
 
-## 2. Fix PR in review
-
-- [ ] Merge the PR that fixes the preflight (it checked the state directory before creating it) and the `NightlySpecterStale` alert (it would fire from the first scrape of a job that never ran).
-
-## 3. Open items that need you (not runnable from this session)
+## 2. Open items that need you (not runnable from this session)
 
 - [ ] **Step 1:** second run of the install scripts as a no-op (needs sudo).
 - [ ] **Steps 10 and 12:** LAN-unreachable check for Open WebUI and Grafana from a second device.
@@ -25,12 +29,12 @@ Token and rehearsal repo done 2026-11-17: fine-grained token for `dsm0014/claude
 - [ ] **Step 13:** `wsl --export`.
 - [ ] **Step 13:** observe a restic prune (needs about eight days of snapshots after 2026-11-16).
 
-## 4. Housekeeping
+## 3. Housekeeping
 
 - [ ] Benchmark `gemma4:12b` and `ministral-3:8b` with `scripts/bench-hermes-tools.py` (not on the PVC now; pull first).
 - [ ] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 
-## 5. Proposed, not decided
+## 4. Proposed, not decided
 
 - [ ] Revisit mesh-native egress (ambient waypoint plus ServiceEntry) instead of Squid when upstream ztunnel can deny unregistered destinations, or when mesh identity and telemetry on egress are wanted. Squid was kept on 2026-11-17; the options and triggers are in `deploy/istio/egress/README.md`.
 
