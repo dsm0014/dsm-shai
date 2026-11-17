@@ -112,7 +112,8 @@ elif p.startswith("You are finding improvement vectors"):
 elif p.startswith("Write one specification"):
     n = re.search(r"# Spec (\d+)", p).group(1)
     t = re.search(r'"title": "([^"]+)"', p).group(1)
-    print("# Spec %s — %s\n\n**Status:** TODO\n\n## Purpose\n\nExample.\n\n## Behavior\n\n- Does it.\n\n## Acceptance Criteria\n\n- [ ] Done.\n\n## Files\n\n- `tools/x.txt`\n" % (n, t))
+    f = "tools/x.txt" if os.environ.get("STUB_BARE_FILES") else "`tools/x.txt`"
+    print("# Spec %s — %s\n\n**Status:** TODO\n\n## Purpose\n\nExample.\n\n## Behavior\n\n- Does it.\n\n## Acceptance Criteria\n\n- [ ] Done.\n\n## Files\n\n- %s\n" % (n, t, f))
 elif p.startswith("Implement one file"):
     path = re.search(r"=== FILE: (\S+) ===", p).group(1)
     print("=== FILE: %s ===\nhello from the nightly job\n=== END ===\nUNMET: none" % path)

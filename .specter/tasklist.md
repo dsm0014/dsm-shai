@@ -6,7 +6,7 @@
 
 Token and rehearsal repo done 2026-11-17: fine-grained token for `dsm0014/claude-specter-auto` only (verified: cannot see the private `claude-specter`, cannot push workflow files, cannot change settings), stored as `deploy/secrets/hermes-github.sops.yaml`; `NIGHTLY_REPO=dsm0014/claude-specter-auto`; probation 1; token expires 2027-02-14. Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
 
-- [ ] **Rehearse on the fork:** dry run, Mode A (up to 3 specs), Mode B (one implementation PR), forced failure, `hermes pause`, one-PR-per-night.
+- [~] **Rehearse on the fork** (`dsm0014/claude-specter-auto`): the first dry run passed on 2026-11-17 (Mode A, 79 s, 3 specs, nothing pushed) and found two bugs, now fixed (index rows must match the table's column count; bare file paths in `## Files` are normalised). The model's specs were well-formed but of mixed quality (for example a vague multi-language docs spec). Still to do: a second dry run to confirm the fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
 - [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.
 

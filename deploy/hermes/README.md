@@ -118,7 +118,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 
 **How a run works.** `run.sh` takes a `flock`, checks the configuration and the kill switches, then `orchestrate.py` clones the repo and `select_mode.py` picks the mode (the model never does). Every model call is one `hermes -z` with a versioned prompt and is followed by a script verifier; a step gets two attempts. `guard.py` checks the diff (paths, size, secrets, spec structure) before anything is pushed. The model's own claim of success is not used.
 
-**Tests (offline, no cluster, no network, no model):** `sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh` runs 33 tests with a stub GitHub API, a stub `hermes` and fixture repos.
+**Tests (offline, no cluster, no network, no model):** `sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh` runs 36 tests with a stub GitHub API, a stub `hermes` and fixture repos.
 
 ### Going live (the owner's steps)
 

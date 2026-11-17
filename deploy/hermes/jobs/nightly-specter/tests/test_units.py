@@ -110,6 +110,20 @@ class SpecUtil(unittest.TestCase):
         self.assertEqual(specutil.allowed_paths(spec_text(1)), [])
         self.assertEqual(specutil.allowed_paths("## Files\n\n- `../etc/passwd`\n"), [])
 
+    def test_normalize_files_wraps_bare_paths(self):
+        t = "## Files\n- .claude/settings.json\n- docs/i18n/\n- `already/ok.py`\n\n## Next\n- not/a/path.txt\n"
+        n = specutil.normalize_files(t)
+        self.assertIn("- `.claude/settings.json`", n); self.assertIn("- `docs/i18n/`", n)
+        self.assertIn("- not/a/path.txt", n)  # outside the Files section, untouched
+        self.assertEqual(specutil.allowed_paths(n), [".claude/settings.json", "already/ok.py", "docs/i18n/"])
+
+    def test_index_row_matches_column_count(self):
+        three = "| # | Spec | Status |\n|---|---|---|\n| 01 | a | DONE |\n"
+        four = "| # | Spec | Status | Open items |\n|---|---|---|---|\n| 01 | a | DONE | x |\n"
+        r3 = specutil.index_add(three, 2, "T", "02-t.md").splitlines()[-1]
+        r4 = specutil.index_add(four, 2, "T", "02-t.md").splitlines()[-1]
+        self.assertEqual(r3.count("|"), 4); self.assertEqual(r4.count("|"), 5)
+
     def test_next_number_and_index(self):
         d = tempfile.mkdtemp(); open(d + "/03-a.md", "w").write("x")
         self.assertEqual(specutil.next_number(d), 4)

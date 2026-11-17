@@ -46,6 +46,15 @@ class RunFlows(unittest.TestCase):
         self.assertNotIn("src/", shown); self.assertIn("specs/02-", shown)
         self.assertNotIn(FAKE_TOKEN, open(os.path.join(e.state, "audit.jsonl")).read() + r.stdout + r.stderr)
 
+    def test_mode_a_bare_file_paths_are_normalised_and_index_stays_three_columns(self):
+        e = self.mkenv(); r = e.run(STUB_BARE_FILES="1"); self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        branch = e.branches()[0]
+        spec = sh("git", "-C", e.remote, "show", branch + ":specs/02-" + [l for l in sh("git", "-C", e.remote, "ls-tree", "--name-only", branch, "specs/").split() if "/02-" in l][0].split("02-")[1])
+        self.assertIn("- `tools/x.txt`", spec)
+        idx = sh("git", "-C", e.remote, "show", branch + ":specs/00-index.md")
+        rows = [l for l in idx.splitlines() if l.startswith("| 02 |") or l.startswith("| 03 |")]
+        self.assertTrue(rows); self.assertTrue(all(l.count("|") == 4 for l in rows), rows)
+
     def test_second_run_same_day_opens_nothing(self):
         e = self.mkenv(); e.run(); n = len(e.requests("POST"))
         r = e.run(); self.assertIn("one-PR-per-night limit", r.stdout)
