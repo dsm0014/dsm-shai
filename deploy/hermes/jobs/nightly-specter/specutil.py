@@ -29,6 +29,21 @@ def allowed_paths(spec_text):
     return sorted(set(out))
 
 
+def normalize_files(text):
+    """The model often lists Files as bare paths. Wrap a bare path in backticks so allowed_paths() can read it."""
+    out, on = [], False
+    for line in text.split("\n"):
+        if re.match(r"^(#{2,4}\s*|\*\*)Files?\b", line, re.I):
+            on = True
+        elif on and re.match(r"^#{1,4}\s", line):
+            on = False
+        m = re.match(r"^(\s*[-*]\s+)([^\s`]+)\s*$", line)
+        if on and m and ("/" in m.group(2) or re.search(r"\.\w+$", m.group(2))):
+            line = "%s`%s`" % (m.group(1), m.group(2))
+        out.append(line)
+    return "\n".join(out)
+
+
 def set_status(text, status, note=""):
     new = "**Status:** %s%s" % (status, (" (" + note + ")") if note else "")
     if re.search(r"^\*\*Status:\*\*.*$", text, re.M):
@@ -43,8 +58,19 @@ def ensure_origin(text, number, title=None):
     return text
 
 
+def index_columns(index_text):
+    """Number of cells in the index table header (the first line starting with '| #')."""
+    for line in index_text.splitlines():
+        if line.startswith("| #"):
+            return line.strip().strip("|").count("|") + 1
+    return 3
+
+
 def index_add(index_text, number, title, filename):
-    row = "| %02d | [%s](./%s) | TODO | origin: nightly-improvement |" % (number, title, filename)
+    """Append a row that matches the table's own column count (3: # Spec Status; 4 adds an open-items cell)."""
+    row = "| %02d | [%s](./%s) | TODO |" % (number, title, filename)
+    if index_columns(index_text) >= 4:
+        row += " origin: nightly-improvement |"
     lines = index_text.rstrip("\n").split("\n")
     last = max([i for i, l in enumerate(lines) if re.match(r"^\| \d\d \|", l)] or [len(lines) - 1])
     lines.insert(last + 1, row)

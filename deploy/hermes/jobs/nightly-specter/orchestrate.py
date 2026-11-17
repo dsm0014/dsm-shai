@@ -168,8 +168,10 @@ def mode_a(repo, base, prs, dry_run):
     for v in kept:
         n = specutil.next_number(specs_dir)
         def v_spec(out, n=n):
-            t = specutil.ensure_origin(out.strip(), n)
+            t = specutil.normalize_files(specutil.ensure_origin(out.strip(), n))
             probs = guard.spec_problems(t)
+            if not specutil.allowed_paths(t):  # without a readable Files list Mode B could never implement it
+                probs.append("no paths in ## Files")
             return (not probs), ("; ".join(probs) or "ok"), t
         body = step("spec:" + v["title"][:40], prompt_text("a-spec", number="%02d" % n, vector=json.dumps(v), inventory=summary), v_spec)
         srcs = [f for f in features if f["repo"] in json.dumps(v)] or features[:3]

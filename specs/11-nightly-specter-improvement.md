@@ -1,6 +1,6 @@
 # Spec 11 — Nightly Specter Improvement
 
-**Status:** PARTIAL (job scripts, 33 local tests, proxy and policy manifests, alerts and Flux wiring are built, merged and running; the proxy and the in-pod preflight are verified in the cluster; the token, the fork rehearsal and the cron entry are open; see deploy/hermes/README.md)
+**Status:** PARTIAL (job scripts, 36 local tests, proxy and policy manifests, alerts and Flux wiring are built, merged and running; the proxy and the in-pod preflight are verified in the cluster; the token, the fork rehearsal and the cron entry are open; see deploy/hermes/README.md)
 
 ## Purpose
 
