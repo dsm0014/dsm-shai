@@ -11,8 +11,8 @@ while IFS= read -r f; do
   if ! grep -q 'ENC\[AES256_GCM' "$f"; then echo "NO CIPHERTEXT: $f"; fail=1; fi
 done < <(git ls-files 2>/dev/null | grep -E '\.sops\.yaml$' | grep -v '^\.sops\.yaml$')
 
-# 2. Plaintext patterns in tracked files: LiteLLM keys, OpenViking keys, age private keys, PEM keys.
-pat='sk-[0-9a-f]{20,}|ovr-[0-9a-f]{20,}|AGE-SECRET-KEY-1[0-9A-Z]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+# 2. Plaintext patterns in tracked files: LiteLLM keys, OpenViking keys, age private keys, PEM keys, GitHub tokens.
+pat='sk-[0-9a-f]{20,}|ovr-[0-9a-f]{20,}|AGE-SECRET-KEY-1[0-9A-Z]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[0-9A-Za-z]{30,}|github_pat_[0-9A-Za-z_]{30,}'
 hits=$(git grep -n -E "$pat" -- . ':!*.md' 2>/dev/null | grep -v 'check-sops.sh' || true)
 if [ -n "$hits" ]; then echo "PLAINTEXT KEY MATERIAL FOUND:"; echo "$hits" | cut -d: -f1,2; fail=1; fi
 

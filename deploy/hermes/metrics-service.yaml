@@ -1,0 +1,13 @@
+# Spec 11: metrics of the nightly job. Scraped by Prometheus (ServiceMonitor hermes-nightly, mesh policy
+# hermes-metrics-from-prometheus). Three gauges, no secrets.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes-metrics
+  namespace: hermes
+  labels: {app.kubernetes.io/name: hermes-metrics}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: hermes}
+  ports:
+    - {name: metrics, port: 9101, targetPort: metrics}

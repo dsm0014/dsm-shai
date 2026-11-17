@@ -42,6 +42,12 @@ if [ -z "$DRY" ] && [ -f "$STATE/runs/$DAY.json" ]; then
   audit skipped "one-PR-per-night limit"; echo "one-PR-per-night limit"; exit 0
 fi
 
+# GitHub is reached through the egress proxy only; interactive Hermes is not proxied.
+if [ -n "${NIGHTLY_HTTPS_PROXY:-}" ]; then
+  export HTTPS_PROXY="$NIGHTLY_HTTPS_PROXY" https_proxy="$NIGHTLY_HTTPS_PROXY"
+  export NO_PROXY="${NO_PROXY:-},.svc,.cluster.local,localhost,127.0.0.1" no_proxy="${NO_PROXY:-},.svc,.cluster.local,localhost,127.0.0.1"
+fi
+
 # Repo-side kill switch (.nightly-disabled on the default branch) is checked after the clone, inside orchestrate.py
 timeout "${NIGHTLY_WALL_SECONDS:-5400}" "$PY" -I "$HERE/orchestrate.py" $DRY 2>&1 | "$PY" -I -c "
 import sys; sys.path.insert(0,'$HERE'); import lib
