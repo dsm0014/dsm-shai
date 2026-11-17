@@ -92,8 +92,8 @@ class RunFlows(unittest.TestCase):
         a = self.last(); self.assertTrue(a.get("blocked")); self.assertEqual(a["status"], "ok")
 
     def test_preflight_reports_tools(self):
-        e = self.mkenv(); os.makedirs(e.state, exist_ok=True); r = e.run("--preflight")
-        self.assertIn("ok      git", r.stdout); self.assertIn("ok      flock", r.stdout)
+        e = self.mkenv(); r = e.run("--preflight")  # state dir deliberately does not exist yet
+        self.assertIn("ok      git", r.stdout); self.assertIn("ok      flock", r.stdout); self.assertIn("state dir writable", r.stdout)
 
 
 if __name__ == "__main__":

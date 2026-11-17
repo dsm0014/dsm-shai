@@ -12,6 +12,7 @@ for a in "$@"; do case "$a" in --dry-run) DRY="--dry-run";; --preflight) PRE=1;;
 
 if [ -n "$PRE" ]; then   # which tools exist in this image; installs nothing
   rc=0
+  mkdir -p "$STATE" 2>/dev/null   # the real run creates it too; preflight must not fail only because it is not there yet
   for t in "$PY" git flock curl timeout; do
     if command -v "$t" >/dev/null 2>&1; then echo "ok      $t"; else echo "MISSING $t"; rc=1; fi
   done

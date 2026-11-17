@@ -23,7 +23,9 @@ spec:
     - name: nightly-specter
       rules:
         - alert: NightlySpecterStale
-          expr: time() - nightly_specter_last_success_timestamp > 36 * 3600
+          # Only once the job has succeeded at least once; a job that never ran (or is not configured yet) writes 0 here
+          # and is covered by NightlySpecterLastRunFailed instead of alerting from the first scrape.
+          expr: (time() - nightly_specter_last_success_timestamp > 36 * 3600) and nightly_specter_last_success_timestamp > 0
           for: 10m
           labels: {severity: warning}
           annotations:

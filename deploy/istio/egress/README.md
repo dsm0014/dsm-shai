@@ -28,7 +28,9 @@ Sources (vendor-heavy; check upstream before relying on them): [Istio blog on eg
 
 Run in Docker with the pod's restrictions (uid 13, read-only root with tmpfs on `/tmp`, `/var/spool/squid`, `/var/log/squid`, `/var/run`, all capabilities dropped): `squid -k parse` accepts `squid.conf` (one warning, `HTTP requires the use of Via`, from `via off`); the process starts; CONNECT to `api.github.com:443` tunnels (200); CONNECT to `example.com:443`, a plain `http://github.com` request and `github.com:8443` are all refused (403, logged `TCP_DENIED`). The image's Squid is built `--with-gnutls`, so `ssl_bump` is not available (confirmed). **Not yet verified in the cluster:** the pod starting under the mesh, the AuthorizationPolicy and the NetworkPolicy. Use the list below.
 
-## Verify before use (in the cluster)
+## Verified in the cluster (2026-11-17)
+
+After the merge Flux created the namespace and the pod (Ready). From the hermes pod: `api.github.com` through the proxy returned 200; `example.com` and plain `http://github.com` were refused (proxy log `TCP_DENIED/403`); `curl` without the proxy failed (the NetworkPolicy blocks direct egress); a CONNECT from the `litellm` pod was reset by the mesh policy `squid-from-hermes`. Repeat these after any change to `squid.conf` or the policies:
 
 1. `kubectl -n egress-proxy get pods` is Ready. If it crash-loops, read `kubectl -n egress-proxy logs deploy/squid`: likely causes are the non-root user (uid 13), the read-only root filesystem, or the `squid -N` command.
 2. Allowed: `kubectl -n hermes exec deploy/hermes -c hermes -- curl -sS -o /dev/null -w '%{http_code}\n' -x http://squid.egress-proxy.svc:3128 https://api.github.com/rate_limit` returns 200 (without a token, a 200 or 403 from GitHub both prove the tunnel works).

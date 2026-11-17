@@ -1,6 +1,6 @@
 # Spec 11 — Nightly Specter Improvement
 
-**Status:** PARTIAL (job scripts, 33 local tests, proxy and policy manifests, alerts and Flux wiring are built and committed; the token, the proxy's first run, in-pod checks, the fork rehearsal and the cron entry are open; see deploy/hermes/README.md)
+**Status:** PARTIAL (job scripts, 33 local tests, proxy and policy manifests, alerts and Flux wiring are built, merged and running; the proxy and the in-pod preflight are verified in the cluster; the token, the fork rehearsal and the cron entry are open; see deploy/hermes/README.md)
 
 ## Purpose
 
@@ -63,7 +63,7 @@ A nightly Hermes job evaluates the user's `claude-specter` repository, compares 
 
 - [x] `select_mode.py` on fixture repos prints B for a repo with an `origin: nightly-improvement` TODO spec, A for one with only DONE or human specs, A when the only TODO spec lacks the origin marker, and HOLD when a `nightly/` PR is open.
 - [x] `guard.py` exits non-zero with a named reason for a diff outside the allowlist, one over 400 lines or 12 files, one touching `.github/`, and a spec missing a required section or front matter.
-- [ ] From the hermes pod, `https://api.github.com/rate_limit` succeeds through the proxy; `https://example.com` returns 403; direct egress without the proxy times out; a CONNECT to a non-allowlisted host is denied (a mismatched SNI is denied only with an OpenSSL-build Squid); no other pod can use the proxy. The proxy log shows each.
+- [x] From the hermes pod, `https://api.github.com/rate_limit` succeeds through the proxy (200); `https://example.com` and plain `http://github.com` are refused (CONNECT 403, logged `TCP_DENIED`); direct egress without the proxy fails; a pod in another namespace (`litellm`) is reset by the mesh policy; the proxy log shows each. Verified in the cluster 2026-11-17. A mismatched SNI is denied only with an OpenSSL-build Squid (not used).
 - [ ] The token cannot read or write any other repository (`gh api repos/<owner>/<other>` returns 403 or 404) and a push under `.github/workflows/` is rejected.
 - [x] `run.sh --dry-run` produces a draft PR or local patch with a report, merges nothing, and the audit entry has `dry_run: true`.
 - [x] A second run on the same date opens no PR and logs the one-PR-per-night limit; a concurrent launch logs `skipped: locked` and writes one audit entry.
