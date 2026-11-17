@@ -14,6 +14,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 08 | [Istio Service Mesh](./08-istio-service-mesh.md) | PARTIAL | Hostname egress allowlist; Grafana and mesh metrics (step 12) |
 | 09 | [LiteLLM Gateway](./09-litellm-gateway.md) | PARTIAL | MCP and browser registration; consumer integrations (done for OpenViking, Hermes and Open WebUI); Istio deny (done); fail-fast on Ollama outage (bounded by a 180 s timeout) |
 | 10 | [GitOps with Flux](./10-flux-gitops.md) | PARTIAL | CI secret scan stays inactive (the `workflow` token scope is not added; the pre-commit scan is active); everything else per `.specter/tasklist.md` step 2 |
+| 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | TODO | Not started. Needs the GitHub egress proxy (amends the spec 08 hostname decision), a repo-scoped GitHub token (amends spec 10), and the job scripts |
 
 ## Measured footprint (2026-11-16)
 
