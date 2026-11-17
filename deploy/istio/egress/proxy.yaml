@@ -1,5 +1,5 @@
-# Forward proxy (Squid) for spec 11. The image is pinned by digest. UNVERIFIED here: no container runtime was
-# available to run `squid -k parse` or start the pod, so check it before relying on it (README, "Verify before use").
+# Forward proxy (Squid) for spec 11. The image is pinned by digest. The config and these pod restrictions were checked
+# in Docker on 2026-11-17 (parse, start, allow and deny). Not yet verified in the cluster (README, "Verify before use").
 apiVersion: v1
 kind: ServiceAccount
 metadata:

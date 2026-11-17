@@ -12,7 +12,7 @@
 
 Built and tested offline: scripts, prompts, 33 local tests, proxy and policy manifests, alerts, Flux wiring. Open:
 
-- [ ] **Squid proxy first run** (the config and image are unverified; no container runtime was available). Run the checks in `deploy/istio/egress/README.md`, "Verify before use".
+- [ ] **Squid proxy first run in the cluster.** Config and pod restrictions were verified in Docker (allow and deny work). Run the in-cluster checks in `deploy/istio/egress/README.md`, "Verify before use (in the cluster)".
 - [ ] **In-pod preflight:** `bash /opt/jobs/nightly-specter/run.sh --preflight`.
 - [ ] **Decide:** the probation default (`IMPL_PROBATION_NIGHTS`, 7 now; `0` is full auto-merge from night 1), token type (fine-grained token or GitHub App), the target repo `owner/name`, the night window.
 - [ ] **Create the token** and the encrypted `deploy/secrets/hermes-github.sops.yaml` (steps in `deploy/hermes/README.md`, "Going live"). Verify the token cannot reach another repo or push to `.github/workflows/`.
