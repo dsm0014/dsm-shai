@@ -1,0 +1,10 @@
+Write one specification document for the improvement below. Follow these steps exactly.
+1. Output only the markdown document, no preamble and no code fence.
+2. Line 1 is exactly: # Spec {{number}} — <short title>
+3. Line 3 is exactly: **Status:** TODO
+4. Then three sections in this order, with these exact headings: ## Purpose (1 to 2 sentences), ## Behavior (a bulleted list of testable requirements), ## Acceptance Criteria (a list where every item starts with "- [ ] ").
+5. Add a section "## Files" listing, as backticked paths, every file the implementation will create or change (at most 8).
+6. Keep it under 70 lines. Write in your own words.
+Improvement (JSON): {{vector}}
+Our repository inventory:
+{{inventory}}
