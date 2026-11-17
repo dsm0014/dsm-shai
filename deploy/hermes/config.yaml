@@ -23,7 +23,9 @@ agent:
   # working directory looks like a code project (/opt/hermes has a pyproject.toml). `kubectl exec ... hermes` is such a
   # surface, so plain questions were answered with tool calls. This is not a coding workspace: turn it off.
   coding_context: "off"
-  disabled_toolsets: ["memory"]
+  # "web" is off: its search and scrape backends are cloud APIs (Parallel, Firecrawl) that need API keys and are denied by
+  # the egress proxy, so every web turn failed. Hermes reaches GitHub with the terminal tool (curl, git) through the proxy.
+  disabled_toolsets: ["memory", "web"]
 
 # OpenViking as memory/knowledge backend over MCP (spec 04). Direct to OpenViking for now: the LiteLLM MCP
 # gateway registration (spec 09) is not yet in place. Key is the tenant user key for account "hermes".
