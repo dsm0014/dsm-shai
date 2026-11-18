@@ -177,3 +177,19 @@ kubectl -n hermes exec deploy/hermes -- sh -c 'hermes doctor'                   
 kubectl -n hermes exec deploy/hermes -- sh -c 'hermes -z "..."'                  # one-shot prompt
 kubectl -n hermes exec deploy/hermes -- sh -c 'hermes logs | grep tool'          # tool activity
 ```
+
+## Claude Haiku through the Claude Code CLI (spec 12)
+
+Haiku runs on your Claude subscription, not the API. No API key exists anywhere; `claude-haiku.sh` unsets `ANTHROPIC_API_KEY` before each call and `make claude-haiku-preflight` fails if one is set.
+
+**Install (once, from WSL):**
+1. `npm install -g @anthropic-ai/claude-code --prefix ~/claude-cli` (host has registry access; the pod does not).
+2. `kubectl -n hermes exec deploy/hermes -- mkdir -p /opt/data/tools` then `kubectl -n hermes cp ~/claude-cli hermes/<pod>:/opt/data/tools/claude -c hermes`.
+3. `claude setup-token`, then `scripts/set-claude-token.sh` (paste the token; it is encrypted with SOPS). Run `scripts/check-sops.sh`, commit, let Flux apply, then `kubectl -n hermes rollout restart deploy/hermes`.
+4. `make claude-haiku-preflight`, then `echo "reply OK" | kubectl -n hermes exec -i deploy/hermes -- bash /opt/jobs/claude-haiku/claude-haiku.sh`.
+
+**Use:** `claude-haiku.sh` reads the prompt on stdin and prints the answer. No tools are given to the model. Limits (env vars): `CLAUDE_HAIKU_PARALLEL` (2), `CLAUDE_HAIKU_DAILY_CALLS` (200), `CLAUDE_HAIKU_TIMEOUT` (120 s), `CLAUDE_HAIKU_MODEL` (`haiku`). Kill switch: `touch /opt/data/claude-haiku/disabled`. Audit: `/opt/data/claude-haiku/audit.jsonl` (no content).
+
+**Data handling:** anything sent to Haiku is processed by Anthropic under your subscription's terms. Do not send memory dumps, secrets or personal data.
+
+**Egress:** the Squid proxy now also allows `api.anthropic.com`, so the Hermes pod can reach that one extra host; other namespaces cannot. **Rotation:** new `claude setup-token`, re-run `set-claude-token.sh`, commit, restart Hermes, preflight, revoke the old token.

@@ -1,47 +1,44 @@
-# Spec 12 — Anthropic Key in LiteLLM
+# Spec 12 — Claude Haiku via Claude Code CLI (subscription)
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 ## Purpose
 
-Add the owner's Anthropic API key to the LiteLLM gateway (spec 09) so that selected consumers can call Claude Haiku through the same OpenAI-compatible endpoint, alongside the local Ollama aliases. This is a deliberate, narrow exception to the "everything runs locally; no cloud model providers" constraint in `CLAUDE.md`. Depends on specs 07 (secrets), 08 (mesh and egress), 09 (LiteLLM) and 11 (egress proxy).
+Give Hermes access to Claude Haiku using the owner's Claude subscription, with no Anthropic API key and no API credits. Haiku is called through the Claude Code CLI (`claude -p`) authenticated by a long-lived subscription token (`claude setup-token`). This replaces the earlier plan of an API key behind a LiteLLM `haiku` alias: a subscription token cannot be used from a third-party gateway such as LiteLLM and the API bills separately. The file name is kept so links stay valid. Depends on specs 07 (secrets), 08 (mesh), 09 (LiteLLM) and 11 (egress proxy). Spec 13 uses the `haiku` tier defined here.
 
 ## Behavior
 
 **Amendment to the local-only rule (owner decision recorded by this spec)**
-- Anthropic is the only permitted cloud provider, and only for the alias `haiku`. No other cloud provider, model or alias is added. `CLAUDE.md`, spec 09 ("No cloud fallbacks") and the spec 09 criterion "No cloud provider is configured" are amended in the same PR to say so.
-- No automatic fallback in either direction: an Ollama outage never reroutes to Anthropic, and an Anthropic failure never reroutes to Ollama. `router_settings.fallbacks` stays empty and `num_retries` stays 0.
+- The only permitted cloud model is Claude Haiku, reached only through the CLI wrapper, on the subscription. LiteLLM stays local-only: no Anthropic provider, alias or key is added to it, and spec 09 is unchanged. `CLAUDE.md` is amended in the same PR.
+- No automatic fallback in either direction. Callers choose the tier by configuration.
 
-**Model alias**
-- New alias `haiku` in `deploy/litellm/config.yaml`: `anthropic/claude-haiku-5-5`, `api_key: os.environ/ANTHROPIC_API_KEY`, timeout 120 s, `max_parallel_requests` set from a documented value (default 8; cloud calls do not compete for the GPU).
-- The model id is pinned in one place so a model upgrade is a one-line change plus a re-run of the acceptance checks.
+**Wrapper**
+- `deploy/hermes/jobs/claude-haiku/claude-haiku.sh` (mounted read-only at `/opt/jobs/claude-haiku/`): prompt on stdin, answer on stdout, `claude -p --model haiku --tools ""` so the CLI has no tools. The model name is pinned in one variable (`CLAUDE_HAIKU_MODEL`).
+- It unsets `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` before every call, so a stray API key can never be used, and `--preflight` fails if one is set. Auth is `CLAUDE_CODE_OAUTH_TOKEN` only.
+- Limits: `CLAUDE_HAIKU_PARALLEL` concurrent calls (default 2, by `flock` slots), `CLAUDE_HAIKU_DAILY_CALLS` per day (default 200), `CLAUDE_HAIKU_TIMEOUT` seconds (default 120), a `disabled` flag file in `/opt/data/claude-haiku/`. Subscription use is bounded by plan rate limits, not dollars, so the caps are call counts.
+- Audit: append-only `/opt/data/claude-haiku/audit.jsonl` with time, status, model, input size and duration. Never prompt or response text, never the token.
 
 **Credential**
-- The key is stored as `deploy/secrets/litellm-anthropic.sops.yaml` (ciphertext only, added to `deploy/secrets/kustomization.yaml`) and delivered to the LiteLLM pod only, as env var `ANTHROPIC_API_KEY` through `secretKeyRef`. It is never in a ConfigMap, manifest, log, prompt, OpenViking or any other pod. Consumers never see it; they hold only LiteLLM virtual keys.
-- The key is an Anthropic workspace key with a monthly spend limit set in the Anthropic console, as the hard cap behind LiteLLM's own budgets. Rotation: create the new key, `sops edit`, commit, let Flux reconcile, restart LiteLLM, run the acceptance check, revoke the old key. The procedure goes in `deploy/litellm/README.md`.
-- The key is committed only after the spec 07 pre-commit secret scan (extended with the `sk-ant-` pattern) passes.
+- The token is stored as `deploy/secrets/hermes-claude.sops.yaml` (ciphertext only), created by `scripts/set-claude-token.sh`, which reads it silently and refuses `sk-ant-api` keys. Delivered to the hermes pod only, as `CLAUDE_CODE_OAUTH_TOKEN` through an optional `secretKeyRef`, so the pod starts without it and the wrapper fails closed.
+- Rotation: `claude setup-token`, re-run `set-claude-token.sh`, commit, let Flux reconcile, restart Hermes, run `make claude-haiku-preflight`, revoke the old token.
+- `scripts/check-sops.sh` also scans for `sk-ant-` strings.
 
-**Access control**
-- Virtual keys get the `haiku` alias only by explicit allowlist. `hermes` gets it (for spec 13); `openviking` and `open-webui` do not. The `hermes` key's budget is split: a separate `max_budget` for `haiku` (default 5 USD per 30 days) so cloud spend cannot be hidden inside the existing local budget; exceeding it returns 429 and Hermes falls back to local-only work by its own configuration, not by LiteLLM.
-- Requests with a missing, wrong or non-allowlisted key are rejected (401/403), as for the existing aliases.
+**Installation**
+- The CLI is installed on the host and copied to `/opt/data/tools/claude` on the Hermes PVC (`kubectl cp`), so no package registry is added to the egress allowlist. `DISABLE_AUTOUPDATER=1` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` are set.
 
 **Egress**
-- LiteLLM is the only workload that may reach `api.anthropic.com`. Egress goes through the spec 11 Squid proxy (`egress-proxy`, `:3128`) with `api.anthropic.com` added to its CONNECT allowlist; the allowlist change lives in `deploy/istio/egress/` and is reviewed there. LiteLLM sets `HTTPS_PROXY` with `NO_PROXY` for `.svc`, `.cluster.local` and the Ollama service.
-- The proxy accepts `:3128` from the `litellm` and `hermes` service accounts only. The hermes pod does not gain a route to Anthropic: it reaches it only through LiteLLM. The GitHub-only hosts for hermes stay as spec 11 defines them.
-- Other namespaces cannot reach the proxy or LiteLLM's cloud path.
+- `api.anthropic.com` is added to the Squid CONNECT allowlist (`deploy/istio/egress/squid.conf`). The proxy already accepts only the hermes service account, so the Hermes pod is the only workload that can reach Anthropic. Other namespaces cannot. This widens the hermes pod's internet reach by one host; the README says so.
 
-**Privacy and observability**
-- Prompt and response logging stays OFF (`turn_off_message_logging: true`). Because content now leaves the machine, the README states plainly that anything sent to `haiku` is processed by Anthropic under its API terms, and lists what Hermes must not send (memory dumps, secrets, personal data). A request is routed to `haiku` only when the caller names that alias.
-- Prometheus metrics (spec 06) show requests, tokens and spend per key and per model, so `haiku` usage is visible. An alert fires when `haiku` spend in a day exceeds a documented threshold.
+**Privacy**
+- Anything sent to Haiku is processed by Anthropic under the consumer terms of the subscription. The README lists what must not be sent (memory dumps, secrets, personal data). A request goes to Haiku only when a caller invokes the wrapper.
 
 ## Acceptance Criteria
 
-- [ ] `deploy/secrets/litellm-anthropic.sops.yaml` is ciphertext only; `git grep -E 'sk-ant-'` is clean outside it; the pre-commit scan, with the `sk-ant-` pattern, passes; `kubectl get cm,secret -A -o yaml` shows the key only in the `litellm` namespace Secret.
-- [ ] A `haiku` chat request through `litellm.litellm.svc:4000/v1` with the `hermes` key succeeds and streams; the same request with the `open-webui` or `openviking` key returns 403; a missing or wrong key returns 401.
-- [ ] `chat`, `embed` and `vision` still work unchanged (spec 09 checks pass).
-- [ ] With the Anthropic host blocked at the proxy, a `haiku` request fails with an error and does not fall back to `chat`; with Ollama stopped, a `chat` request does not reach Anthropic (proxy log shows no call).
-- [ ] From the hermes pod, `https://api.anthropic.com` is refused (direct and through the proxy path not mapped to it); from the `litellm` pod it succeeds through the proxy; from another namespace it is reset; the proxy log shows each.
-- [ ] Exceeding the `hermes` `haiku` budget returns 429 for `haiku` while `chat` keeps working.
-- [ ] `haiku` request counts, tokens and spend appear in Prometheus per key; the spend alert rule loads; logs contain no prompt or response content and no key.
-- [ ] A LiteLLM Postgres backup and restore (spec 07) preserves the virtual keys and the `haiku` allowlist; a key rotation following the README leaves the gateway serving `haiku`.
-- [ ] `CLAUDE.md`, spec 09 and `deploy/litellm/README.md` carry the amendment, the data-handling statement and the rotation procedure.
+- [ ] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret.
+- [ ] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set.
+- [ ] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage.
+- [ ] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI).
+- [ ] From the hermes pod `https://api.anthropic.com` works through the proxy; from another namespace it is refused; the proxy log shows the allowed call.
+- [ ] `chat`, `embed` and `vision` through LiteLLM still work and LiteLLM has no Anthropic configuration.
+- [ ] Logs and audit files contain no prompt, response or token.
+- [ ] `CLAUDE.md` and `deploy/hermes/README.md` carry the amendment, the data-handling statement, the install steps and the rotation procedure.
