@@ -29,6 +29,14 @@ Let Hermes finish tasks on its own by splitting them across a swarm of workers: 
 - Audit: append-only JSONL `/opt/data/swarm/audit.jsonl` with run ID, task, per-step worker, tier, verifier result, token usage and cost per model (from LiteLLM spend for key `hermes`), plus a one-line summary `remember` into OpenViking. Metrics `swarm_last_success_timestamp`, `swarm_last_run_status` and `swarm_haiku_tokens_total` are served read-only and scraped by Prometheus (spec 06).
 - Kill switches: `hermes pause`, a `/opt/data/swarm/disabled` flag file checked before each run, revoking the `haiku` permission on the `hermes` virtual key.
 
+**Make interface (root `Makefile`, same style as the `nightly-*` targets; each target has a `##` help line)**
+- `make swarm-preflight`: check the tools, state directory, `haiku` and `chat` reachability through LiteLLM, and that the key budget is not spent.
+- `make swarm-plan TASK=<name>`: the dry run; builds and prints the plan, makes no worker call, spends nothing.
+- `make swarm-run TASK=<name>`: runs the task in the pod in the background with a log under `/opt/data/swarm/`. `TASK` is a name under `deploy/hermes/jobs/` (default `swarm-example`) or a path to a task YAML. Tasks that write outside the state directory need `CONFIRM=1`, as `nightly-run` does. `SWARM_ORCHESTRATOR=chat` and `SWARM_HAIKU_PARALLEL=<n>` pass through as variables.
+- `make swarm-status`: running or not, last audit entries, digest lines, metrics, and Haiku spend for the day.
+- `make swarm-stop`: stops the running swarm cleanly (releases the lock); `make swarm-test`: the offline tests (fake gateway, no cluster needed). `make hermes-pause` stays the emergency stop.
+- A missing or unknown `TASK` prints usage and exits 2; the targets work from the repo root with no extra setup.
+
 **Hermes cron template and example**
 - `deploy/hermes/jobs/swarm-template/` holds a documented template: `task.example.yaml`, `run.sh` (flock, timeout, state dir, calls `swarm.py`), `register-cron.sh` (prints the `hermes cron create ... --paused` command with a schedule placeholder, same convention as spec 11), and a README of every field.
 - `deploy/hermes/jobs/swarm-example/` is a runnable instance of the template: a daily "repo digest" task (nightly or on demand) that reads a configured public repo, uses local workers to summarise each changed file, uses a Haiku step to merge the summaries into one report, and stores it in OpenViking. It writes no files outside its state directory, so it is safe to run unattended.
@@ -45,5 +53,6 @@ Let Hermes finish tasks on its own by splitting them across a swarm of workers: 
 - [ ] With `SWARM_ORCHESTRATOR=chat` and Anthropic blocked, the example completes with local workers only and the audit entry records `haiku_tokens: 0`.
 - [ ] A live run of `swarm-example` completes: local steps run, one Haiku merge step runs, the report is stored in OpenViking, the audit entry has per-model token counts matching LiteLLM spend, and nothing is written outside `/opt/data/swarm/`.
 - [ ] The cron entry registers paused via `register-cron.sh`; `hermes cron resume <id>` runs it at the next schedule time; `hermes cron incidents` shows a failure when forced.
+- [ ] `make swarm-test` passes offline; `make swarm-plan`, `swarm-run`, `swarm-status` and `swarm-stop` work on `swarm-example` from the repo root; a missing `TASK` exits 2 with usage; `make help` lists every swarm target.
 - [ ] `git grep -E 'sk-ant-|ghp_|github_pat_' -- . ':!*.md'` is clean; no key appears in a ConfigMap, log or audit file.
 - [ ] `deploy/hermes/README.md` documents the roles, caps, routing rules, template fields, kill switches and how to create a new job from the template; spec 04 carries a pointer to this spec.
