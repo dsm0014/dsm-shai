@@ -5,7 +5,7 @@
 # Guards: disabled flag, one call at a time per slot (CLAUDE_HAIKU_PARALLEL, default 2), daily call cap, timeout, audit line (no prompt text).
 set -u
 STATE="${CLAUDE_HAIKU_STATE:-/opt/data/claude-haiku}"
-CLI="${CLAUDE_BIN:-/opt/data/tools/claude/bin/claude}"
+CLI="${CLAUDE_BIN:-/opt/claude/bin/claude}"
 MODEL="${CLAUDE_HAIKU_MODEL:-haiku}"          # the only place the model name is pinned
 PAR="${CLAUDE_HAIKU_PARALLEL:-2}"
 DAILY="${CLAUDE_HAIKU_DAILY_CALLS:-200}"

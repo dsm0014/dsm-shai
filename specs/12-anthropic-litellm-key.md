@@ -24,7 +24,7 @@ Give Hermes access to Claude Haiku using the owner's Claude subscription, with n
 - `scripts/check-sops.sh` also scans for `sk-ant-` strings.
 
 **Installation**
-- The CLI is installed on the host and copied to `/opt/data/tools/claude` on the Hermes PVC (`kubectl cp`), so no package registry is added to the egress allowlist. `DISABLE_AUTOUPDATER=1` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` are set.
+- The CLI is baked into a custom image, `deploy/hermes/image/Dockerfile`, built `FROM` the pinned upstream Hermes image (the general place for custom additions). `scripts/build-hermes-image.sh` builds it and loads it into k3s containerd (no registry); the main `hermes` container uses the local tag with `imagePullPolicy: IfNotPresent`. Nothing is downloaded or copied at runtime, and no package registry is added to the egress allowlist. `DISABLE_AUTOUPDATER=1` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` are set.
 
 **Egress**
 - `api.anthropic.com` is added to the Squid CONNECT allowlist (`deploy/istio/egress/squid.conf`). The proxy already accepts only the hermes service account, so the Hermes pod is the only workload that can reach Anthropic. Other namespaces cannot. This widens the hermes pod's internet reach by one host; the README says so.
@@ -35,6 +35,7 @@ Give Hermes access to Claude Haiku using the owner's Claude subscription, with n
 ## Acceptance Criteria
 
 - [ ] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret.
+- [ ] The custom image builds and loads (`scripts/build-hermes-image.sh`), the pod runs from it as user 10000, and `claude --version` works in it.
 - [ ] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set.
 - [ ] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage.
 - [ ] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI).
