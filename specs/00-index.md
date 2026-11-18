@@ -16,6 +16,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 10 | [GitOps with Flux](./10-flux-gitops.md) | PARTIAL | CI secret scan stays inactive (the `workflow` token scope is not added; the pre-commit scan is active); everything else per `.specter/archive/tasklist-specs-01-10-2026-11-16.md` step 2 |
 | 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | PARTIAL | Built, merged and running inert (proxy and preflight verified in the cluster). Open: GitHub token, `hermes pause` test, fork rehearsal, cron entry, go-live |
 | 12 | [Anthropic Key in LiteLLM](./12-anthropic-litellm-key.md) | TODO | Not started |
+| 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | TODO | Not started |
 
 ## Measured footprint (2026-11-16)
 
