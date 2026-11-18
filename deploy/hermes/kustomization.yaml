@@ -28,6 +28,10 @@ configMapGenerator:
       - prompt-a-vectors=jobs/nightly-specter/prompts/a-vectors.v1.txt
       - prompt-a-spec=jobs/nightly-specter/prompts/a-spec.v1.txt
       - prompt-b-implement=jobs/nightly-specter/prompts/b-implement.v1.txt
+  # Spec 12: Claude Haiku through the Claude Code CLI (subscription), mounted read-only at /opt/jobs/claude-haiku.
+  - name: hermes-claude-haiku
+    files:
+      - claude-haiku.sh=jobs/claude-haiku/claude-haiku.sh
   # Spec 11 settings. The job fails closed while NIGHTLY_REPO is empty or the token is missing. It points at the
   # private rehearsal copy dsm0014/claude-specter-auto; switch to the real repo only after the rehearsal passes.
   - name: nightly-specter-env

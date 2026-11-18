@@ -15,7 +15,7 @@ export TASK
 export REASON
 
 .PHONY: help start stop status verify hermes-task hermes-pause hermes-resume \
-        nightly-preflight nightly-dry-run nightly-run nightly-status test
+        claude-haiku-preflight nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## /\1\t/' | awk -F'\t' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -72,6 +72,9 @@ nightly-run: ## Real run: opens and may MERGE pull requests in the target repo (
 
 nightly-status: ## Is it running, last audit entries, digest, metrics
 	@$(HERMES) sh -c 'pgrep -f "[o]rchestrate.py" >/dev/null && echo "RUNNING" || echo "not running"; echo "--- audit (last 3)"; tail -3 $(STATE)/audit.jsonl | cut -c1-400; echo "--- digest"; tail -5 $(STATE)/digest.log; echo "--- metrics"; cat $(STATE)/metrics.prom 2>/dev/null | grep -v "^#" || true' $(QUIET)
+
+claude-haiku-preflight: ## Spec 12: is the Claude CLI and subscription token present in the pod (no call made)
+	@$(HERMES) bash /opt/jobs/claude-haiku/claude-haiku.sh --preflight $(QUIET)
 
 test: ## Run the nightly job's offline tests (no cluster needed)
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh

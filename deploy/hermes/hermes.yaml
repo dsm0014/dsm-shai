@@ -59,7 +59,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: hermes
-          image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+          image: dsm-shai/hermes:v0.23.1-1     # spec 12: upstream plus the Claude Code CLI; built by scripts/build-hermes-image.sh (no registry)
           imagePullPolicy: IfNotPresent
           # Skip the s6 /init (root PID 1). The init container has already set ownership and seeded config.
           command: ["/opt/hermes/docker/main-wrapper.sh"]
@@ -86,6 +86,15 @@ spec:
                   name: hermes-github
                   key: token
                   optional: true
+            - name: CLAUDE_CODE_OAUTH_TOKEN     # spec 12: subscription token for the Claude Code CLI; no API key anywhere
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-claude
+                  key: oauth-token
+                  optional: true
+            - {name: CLAUDE_CONFIG_DIR, value: /opt/data/claude}
+            - {name: DISABLE_AUTOUPDATER, value: "1"}
+            - {name: CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, value: "1"}
             - name: NIGHTLY_HTTPS_PROXY         # kept for the job wrapper, which exports HTTPS_PROXY from it
               value: "http://squid.egress-proxy.svc:3128"
             # The whole pod, interactive Hermes and its tools included, reaches the internet only through the egress proxy
@@ -129,6 +138,9 @@ spec:
             - name: nightly-jobs
               mountPath: /opt/jobs/nightly-specter
               readOnly: true
+            - name: claude-haiku-job
+              mountPath: /opt/jobs/claude-haiku
+              readOnly: true
         - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
@@ -159,6 +171,10 @@ spec:
         - name: tmp                            # Node compile cache, uv locks, runtime scratch
           emptyDir:
             sizeLimit: 1Gi
+        - name: claude-haiku-job               # spec 12 wrapper, read-only
+          configMap:
+            name: hermes-claude-haiku
+            defaultMode: 0555
         - name: nightly-jobs                   # spec 11 job scripts, read-only; prompts are mapped into prompts/
           configMap:
             name: hermes-nightly-specter

@@ -1,5 +1,7 @@
 # Spec 13 — Hermes Swarm Orchestration (Haiku + Qwen 9B)
 
+> **Amendment (spec 12 rewrite):** `haiku` is no longer a LiteLLM alias. Every Haiku call in this spec means `/opt/jobs/claude-haiku/claude-haiku.sh` (Claude Code CLI, subscription). Wherever this spec says Haiku goes through LiteLLM, uses the `hermes` key budget, or reports LiteLLM spend, read: the wrapper's call-count caps and `audit.jsonl` instead (tokens and USD are not metered on a subscription). "Revoke `haiku` on the key" becomes the wrapper's `disabled` flag or removing the token. Reconcile the criteria when implementing.
+
 **Status:** TODO
 
 ## Purpose
