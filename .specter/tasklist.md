@@ -1,41 +1,56 @@
 # Task List: Remaining Work
 
-**As of 2026-11-17 (after the spec 11 merge).** Only work still to do. Legend: `[ ]` not started, `[~]` started. Remove an item when it is done.
+**As of 2026-11-17.** Only work still to do. Legend: `[ ]` not started, `[~]` started. Remove an item when it is done. Sizes: S under an hour, M a session, L several sessions or needs you.
 
-## 1. Spec 11: nightly specter improvement (built, merged, running inert)
+Specs 01, 04 to 08, 10 and 11 are not DONE. Most of the gap is bookkeeping (section 1), a few decided-out-of-scope criteria (section 2) and checks that need you at the machine (section 4). Real engineering is sections 3 and 5.
 
-Token and rehearsal repo done 2026-11-17: fine-grained token for `dsm0014/claude-specter-auto` only (verified: cannot see the private `claude-specter`, cannot push workflow files, cannot change settings), stored as `deploy/secrets/hermes-github.sops.yaml`; `NIGHTLY_REPO=dsm0014/claude-specter-auto`; probation 1; token expires 2027-02-14. Verified in the cluster on 2026-11-17: the Squid proxy (allow, deny, no bypass, other namespaces refused), the in-pod preflight, the mounted scripts under the read-only root, the unconfigured run (`not configured`, exit 0), and the Prometheus target and rules. Open:
+## 1. Bookkeeping: make the spec files match what is already verified (S, one PR)
 
-- [~] **Rehearse on the fork** (`dsm0014/claude-specter-auto`): the first dry run passed on 2026-11-17 (Mode A, 79 s, 3 specs, nothing pushed) and found two bugs, now fixed (index rows must match the table's column count; bare file paths in `## Files` are normalised). The model's specs were well-formed but of mixed quality (for example a vague multi-language docs spec). Still to do: a second dry run to confirm the fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
+Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11 have 7 and 4 open, although most of those criteria were verified (evidence is in each `deploy/*/README.md`).
+
+- [ ] For each of specs 01 to 11, tick every acceptance criterion that a `deploy/*/README.md` records as verified; leave the rest open. Then set each spec's status in `specs/00-index.md` from the remaining unticked boxes only, and refresh its "as of" date.
+
+## 2. Amend criteria that were decided out of scope (S, one PR with section 1)
+
+The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
+
+- [ ] **Spec 04:** drop the browser MCP tools; reword "an allowlisted web host is reachable" to the five GitHub hosts through the Squid proxy (spec 11); record that Hermes reaches OpenViking directly, not through the LiteLLM MCP gateway (tool-surface problem with the 9B model).
+- [ ] **Spec 08:** reword the hostname-allowlist criterion to the same GitHub-only proxy for the hermes pod (`REGISTRY_ONLY` does not block unregistered hosts in ambient).
+- [ ] **Spec 09:** drop the browser MCP and browser pod criteria; reword "fails fast when Ollama is down" to "bounded by the 180 s timeout".
+- [ ] **Spec 10:** reword the CI secret scan criterion to the pre-commit scan only (the `workflow` token scope is not added; the workflow file stays in `ci/`).
+- [ ] **Spec 11 and `deploy/hermes/README.md` (step 1 of the GitHub token section):** the token is now fine-grained for all repositories (Contents and Pull requests read/write, Metadata read; no Administration, no Workflows; expires 2027-02-14), not a single repository. Update the wording, and the spec 10 amendment that says the hermes namespace holds a single-repo token.
+
+## 3. Real work I can do without you
+
+- [ ] **Mesh metrics and dashboard (M; closes the open item in specs 06 and 08):** scrape istiod, ztunnel and the ingress gateway with a ServiceMonitor or PodMonitor in `deploy/monitoring/`, provision an Istio dashboard in Grafana, check the series in Prometheus, record it in `deploy/monitoring/README.md` and `deploy/istio/README.md`.
+- [ ] **Alert fire tests (S to M; spec 06):** VRAM above a lowered threshold, a crash-looping test pod, PVC fill. Tick the criterion only if all three fire.
+- [ ] **Virtual keys survive a Postgres restore (S; spec 09):** run it as part of the spec 07 restore drill (section 4), then tick the spec 09 criterion.
+- [ ] **Recovery script for pods ztunnel did not enrol after `wsl --shutdown` (S to M):** delete the affected pods automatically (seen on `postgres-0`, `openviking`, `prometheus-0`).
+
+## 4. Needs you at the machine
+
+- [ ] **Spec 01:** second run of the install scripts as a no-op (sudo); `deploy/README.md` bootstrap order.
+- [ ] **Specs 05 and 06:** from a second LAN device, Open WebUI and Grafana are unreachable; from a Windows browser, `open-webui.localhost` and Grafana load.
+- [ ] **Spec 07 (destructive or needs root):** live restore over running PVCs; fresh-cluster restore (second install); k3s datastore snapshot (root); `wsl --export`; observe a restic prune (needs about eight days of snapshots after 2026-11-16).
+
+## 5. Spec 11: nightly specter improvement (built, merged, inert)
+
+- [ ] **Isolation guard (S):** the token no longer limits the job to `claude-specter-auto`, so `NIGHTLY_REPO` is the only thing that does. Check that the job refuses any other target, and that a wrong `NIGHTLY_REPO` fails closed.
+- [~] **Rehearse on the rehearsal repo** (`dsm0014/claude-specter-auto`): the first dry run passed (Mode A, 3 specs, nothing pushed). Still to do: a second dry run to confirm the two bug fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
 - [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.
 
-## 2. Fix PR in review
+## 6. Housekeeping
 
-- [ ] Merge the PR that fixes the preflight (it checked the state directory before creating it) and the `NightlySpecterStale` alert (it would fire from the first scrape of a job that never ran).
-
-## 3. Open items that need you (not runnable from this session)
-
-- [ ] **Step 1:** second run of the install scripts as a no-op (needs sudo).
-- [ ] **Steps 10 and 12:** LAN-unreachable check for Open WebUI and Grafana from a second device.
-- [ ] **Steps 10 and 12:** Windows browser check for `open-webui.localhost` and Grafana.
-- [ ] **Step 13:** live restore over running PVCs (destructive).
-- [ ] **Step 13:** fresh-cluster restore (needs a second install).
-- [ ] **Step 13:** k3s datastore snapshot (needs root).
-- [ ] **Step 13:** `wsl --export`.
-- [ ] **Step 13:** observe a restic prune (needs about eight days of snapshots after 2026-11-16).
-
-## 4. Housekeeping
-
+- [ ] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
+- [ ] Trim `docs/architecture.md` to a real one-pager: fix the garbled diagram and the host RAM row (WSL exposes about 15 GB by default, not 24 GB).
 - [ ] Benchmark `gemma4:12b` and `ministral-3:8b` with `scripts/bench-hermes-tools.py` (not on the PVC now; pull first).
 - [ ] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 
-## 5. Proposed, not decided
+## 7. Proposed, not decided
 
-- [ ] Revisit mesh-native egress (ambient waypoint plus ServiceEntry) instead of Squid when upstream ztunnel can deny unregistered destinations, or when mesh identity and telemetry on egress are wanted. Squid was kept on 2026-11-17; the options and triggers are in `deploy/istio/egress/README.md`.
-
-- [ ] A recovery script that deletes pods ztunnel did not enrol after a restart, so `wsl --shutdown` recovery is not manual. (Seen again on 2026-11-16: `postgres-0`, `openviking`, `prometheus-0`.)
+- [ ] Revisit mesh-native egress (ambient waypoint plus ServiceEntry) instead of Squid when upstream ztunnel can deny unregistered destinations, or when mesh identity and telemetry on egress are wanted (options and triggers in `deploy/istio/egress/README.md`).
 
 ## Not planned (decided out of scope)
 
-Browser MCP tools, a hostname egress allowlist for anything other than the spec 11 GitHub hosts, SearXNG, activating the CI secret scan, and a LiteLLM fail-fast shorter than the 180 s timeout.
+Browser MCP tools, a hostname egress allowlist for anything other than the spec 11 GitHub hosts, SearXNG, activating the CI secret scan, and a LiteLLM fail-fast shorter than the 180 s timeout. Section 2 amends the specs to say so.
