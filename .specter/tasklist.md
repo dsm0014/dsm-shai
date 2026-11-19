@@ -9,7 +9,7 @@ Specs 01, 04 to 08 and 10 to 13 are not DONE. Most of the gap is bookkeeping (se
 Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered paused, resume it with `hermes cron resume 21b81355887d` when you want the nightly digest). Remaining:
 
 - [ ] **Close spec 12 (S, needs you):** the Anthropic console API-usage check, and one `vision` request through LiteLLM (needs the Open WebUI key; I will not use the master key). Then set spec 12 DONE in the index.
-- [~] **Spec 14 built and merged (PR #45):** remaining is the live run on this repo (a `[swarm]` task is queued below) and the owner flipping `SWARM_REPO_WORK` to 1; then set spec 14 DONE.
+- [~] **Spec 14 built and merged (PR #45):** remaining is the live run on this repo (a small `[swarm]` task is queued in section 6; the first run's PR was closed, see the spec 14 amendment) and the owner flipping `SWARM_REPO_WORK` to 1; then set spec 14 DONE.
 
 ## 0b. Spec 15: Discord, swarm commands, Haiku web research
 
@@ -58,7 +58,8 @@ The decisions are made; the criteria still demand the work, so these specs canno
 
 ## 6. Housekeeping
 
-- [ ] [swarm] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
+- [ ] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
+- [ ] [swarm] Fix the host RAM row in `docs/architecture.md` (WSL exposes about 15 GB by default, not 24 GB).
 - [ ] Trim `docs/architecture.md` to a real one-pager: fix the garbled diagram and the host RAM row (WSL exposes about 15 GB by default, not 24 GB).
 - [ ] Benchmark `gemma4:12b` and `ministral-3:8b` with `scripts/bench-hermes-tools.py` (not on the PVC now; pull first).
 - [ ] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.

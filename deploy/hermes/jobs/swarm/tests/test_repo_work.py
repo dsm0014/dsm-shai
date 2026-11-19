@@ -462,3 +462,32 @@ class FormerGap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FileSizeAndDeletionGuards(RepoWorkCase):
+    """The first live run (2026-11-19) turned a 340 line README into 38 lines: the worker saw only part of the file."""
+
+    def _big_remote(self, lines):
+        files = seed_files()
+        files["docs/a.md"] = "\n".join("line %d of the document" % i for i in range(lines)) + "\n"
+        return make_remote(self.root, "big", files)
+
+    def test_file_too_large_to_see_whole_is_refused_before_any_worker_call(self):
+        rc, out, err = self.run_repo("--run-id", "run-big", SWARM_CLONE_URL=self._big_remote(40), SWARM_MAX_FILE_CHARS="200")
+        self.assertEqual(rc, 2, out + err)
+        self.assertEqual(self.last()["status"], "refused")
+        self.assertIn("larger than the worker can see", self.last()["reason"])
+        self.assertNoWorkerCalls()
+        self.assertEqual(self.branches(), [])
+        self.assertEqual(self.posts(), [])
+        self.assertEqual(self.workdirs(), [])
+
+    def test_rewrite_that_deletes_most_of_a_file_fails_and_pushes_nothing(self):
+        short = lambda prompt: fence("# Short\n\nOnly a few lines, mentions docs/a.md\n")
+        self.env.gateway.reply = reply_for(["docs/a.md"], worker=short)
+        rc, out, err = self.run_repo("--run-id", "run-shrink", SWARM_CLONE_URL=self._big_remote(60))
+        self.assertEqual(rc, 1, out + err)
+        self.assertEqual(self.last()["status"], "failed")
+        self.assertIn("deletes too much", self.last()["reason"])
+        self.assertEqual(self.branches(), [])
+        self.assertEqual(self.posts(), [])
