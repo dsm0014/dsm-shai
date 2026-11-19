@@ -99,12 +99,10 @@ def main(task, run, swarm, lockf, state_name):
     try:
         if os.environ.get("SWARM_REPO_WORK") != "1":
             raise Refused("SWARM_REPO_WORK is not 1")
-        # guards, in order: open swarm PR, daily limit, pick
+        # guards, in order: open swarm PR (one at a time), pick. There is no per-day limit (owner decision 2026-11-19).
         pulls = api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo)
         if any((p.get("head") or {}).get("ref", "").startswith("swarm/") for p in pulls):
             raise Refused("skipped: pr open")
-        if not run.dry and any(e.get("pr_url") and e.get("date") == lib.today() for e in lib.read_audit()):
-            raise Refused("skipped: daily limit")
         md = api("GET", "/repos/%s/contents/%s" % (repo, TASKLIST), raw=True)
         info, skipped = pick_task.pick(md)
         for n, why in skipped:

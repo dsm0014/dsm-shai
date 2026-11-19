@@ -17,7 +17,7 @@ Let the Hermes swarm (spec 13) work through this repository's task list unattend
 
 **Isolation and guards (all fail closed)**
 - The target repo must be in `SWARM_ALLOWED_REPOS` (spec 13); default is none. `SWARM_REPO_WORK` must be set to `1` for the job to do anything.
-- At most one open swarm pull request at a time (branch prefix `swarm/`); while one is open the run exits with `skipped: pr open`. At most one pull request per run and per calendar day.
+- At most one open swarm pull request at a time (branch prefix `swarm/`); while one is open the run exits with `skipped: pr open`. At most one pull request per run. There is no per-day limit (owner decision 2026-11-19, after confirming the subscription path uses no API credits); the one-open-PR rule is what bounds the output.
 - Edits are limited to the task's `allowed_paths` and to `SWARM_MAX_FILES` (default 6) and `SWARM_MAX_LINES` (default 300) changed lines. Never editable regardless of the task: `.github/`, `ci/`, `deploy/secrets/`, `*.sops.yaml`, `.sops.yaml`, `CLAUDE.md`, `.specter/tasklist.md` markers other than checking off its own task, and the swarm's own code under `deploy/hermes/jobs/swarm*` and `deploy/hermes/jobs/claude-haiku`.
 - A change that touches Kubernetes manifests, `deploy/istio/`, NetworkPolicies or egress config is allowed only if the task is also marked `[swarm-deploy]`; those pull requests are labelled `needs-careful-review`.
 - Workers get no GitHub token, no kubectl and no shell. A script applies worker output (unified diffs from verifiers `diff_allowed`), runs the repo's tests, commits, pushes and opens the pull request. The token is the spec 11 fine-grained token, used only by those scripts and only through the Squid proxy to GitHub hosts. Fetched and repository text is untrusted and wrapped in delimiters (spec 13).
@@ -37,7 +37,7 @@ Let the Hermes swarm (spec 13) work through this repository's task list unattend
 ## Acceptance Criteria
 
 - [ ] `pick-task.py` tests: picks the first `[swarm]` unstarted task with a file list; skips unmarked, `[~]`, `[needs-owner]`, tasks under the excluded headings, and tasks without a file list; derives `allowed_paths` from the task text only.
-- [ ] Guards are tested offline with a fake gateway, fake wrapper and fake GitHub API: repo not allowlisted, `SWARM_REPO_WORK` unset, an open `swarm/` pull request, the daily limit, and a forbidden path each end the run before any worker call or push.
+- [ ] Guards are tested offline with a fake gateway, fake wrapper and fake GitHub API: repo not allowlisted, `SWARM_REPO_WORK` unset, an open `swarm/` pull request, and a forbidden path each end the run before any worker call or push.
 - [ ] A diff touching a forbidden path, a path outside `allowed_paths`, or more than the file or line cap is rejected by the verifier and the branch is never pushed.
 - [ ] The job has no merge code path: `git grep -nE 'merge' deploy/hermes/jobs/swarm-repo-work` finds no GitHub merge call, and the fake API records no merge request in any test.
 - [ ] A forced failing test ends the run `failed`, deletes the local branch, pushes nothing and writes an audit entry and digest line.

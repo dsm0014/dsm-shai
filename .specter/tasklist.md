@@ -8,7 +8,7 @@ Specs 01, 04 to 08 and 10 to 13 are not DONE. Most of the gap is bookkeeping (se
 
 Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered paused, resume it with `hermes cron resume 21b81355887d` when you want the nightly digest). Remaining:
 
-- [ ] **Close spec 12 (S, needs you):** the Anthropic console API-usage check, and one `vision` request through LiteLLM (needs the Open WebUI key; I will not use the master key). Then set spec 12 DONE in the index.
+- [ ] **Close spec 12 (S, needs you):** the console check is confirmed (owner, 2026-11-19). Remaining: one `vision` request through LiteLLM with the Open WebUI key (I will not use the master key). Then set spec 12 DONE.
 - [~] **Spec 14 built and merged (PR #45):** remaining is the live run on this repo (a small `[swarm]` task is queued in section 6; the first run's PR was closed, see the spec 14 amendment) and the owner flipping `SWARM_REPO_WORK` to 1; then set spec 14 DONE.
 
 ## 0b. Spec 15: Discord, swarm commands, Haiku web research
