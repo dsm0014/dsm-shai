@@ -1,36 +1,3 @@
-# dsm-shai — High-Level Architecture Overview
-
-**Linked from README:** See [`specs/00-index.md`](../specs/00-index.md) for the build plan and spec catalog.
-
----
-
-## Purpose
-
-`dsm-shai` is a self-hosted, autonomous AI stack running locally on Windows 11 + WSL2 with a single NVIDIA RTX 4080 (16 GB). It orchestrates Ollama (inference), OpenViking (memory/knowledge database), and Hermes Agent (autonomous task execution) on a single-node k3s cluster behind an Istio service mesh. All model inference runs locally via the free-tier LiteLLM gateway; no cloud providers are used.
-
----
-
-## Target Hardware
-
-| Component                | Specification                              |
-|--------------------------|--------------------------------------------|
-| CPU                      | Intel i7-13700KF (16C/24T)                |
-| GPU                      | NVIDIA RTX 4080, 16 GB VRAM               |
-| Host RAM                 | 32 GB (WSL exposed: ~24 GB)                |
-| Disk                     | WSL ext4 volume (~950 GB free)             |
-| Host OS                  | Windows 11                                 |
-| Cluster                  | k3s single-node, containerd, GPU plugin    |
-
-**Constraints:**
-- The 16 GB GPU is shared by chat model (~14B Q4), embedding, and VLM. Models swap via Ollama keep-alive.
-- 30B+ models do not fit and are out of scope.
-- KV cache counts against the VRAM budget; agent context requires 32k–64k tokens.
-
----
-
-## Architecture Diagram (Conceptual)
-
-```
                     ┌─────────────────────────────────────┐
                     │           Windows Host               │
                     │   (i7-13700KF + RTX 4080 16 GB)     │
