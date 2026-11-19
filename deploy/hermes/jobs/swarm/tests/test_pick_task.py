@@ -135,7 +135,7 @@ class FormerGap(unittest.TestCase):
     def test_subsection_under_excluded_heading_is_still_excluded(self):
         # Engine gap (pick_task.py, pick(): `heading` is overwritten by any heading, so `### Sub` under
         # "## Needs you at the machine" makes an item count as not excluded). Spec 14 says anything under the
-        # heading is never picked. Remove the expectedFailure once pick() tracks the enclosing excluded section.
+        # heading is never picked. Fixed: pick() now tracks the enclosing excluded section.
         md = _list("## Needs you at the machine", "### Hardware", "- [ ] [swarm] Plug in `docs/a.md`")
         task, skipped = pick_task.pick(md)
         self.assertIsNone(task)

@@ -32,6 +32,10 @@ class Refused(Exception):
     pass
 
 
+class GitError(Exception):
+    """A git command failed (clone, push, commit): the run failed, it was not refused by a guard."""
+
+
 def api(method, path, body=None, raw=False):
     base = os.environ.get("SWARM_GITHUB_API", "https://api.github.com")
     h = {"Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json", "User-Agent": "dsm-shai-swarm"}
@@ -49,7 +53,7 @@ def api(method, path, body=None, raw=False):
 def git(*a, cwd, check=True):
     p = subprocess.run(["git", *a], cwd=cwd, capture_output=True, text=True, timeout=600)
     if check and p.returncode != 0:
-        raise Refused("git %s failed: %s" % (a[0], lib.redact(p.stderr.strip()[:200])))
+        raise GitError("git %s failed: %s" % (a[0], lib.redact(p.stderr.strip()[:200])))
     return p.stdout
 
 
@@ -194,7 +198,7 @@ def main(task, run, swarm, lockf, state_name):
         msg = str(e)
         status = "ok" if msg == "ok-dry" else ("skipped" if msg.startswith("skipped") else "refused")
         reason = "" if msg == "ok-dry" else msg
-    except (swarm.Failed, workers.WorkerError, subprocess.TimeoutExpired, urllib.error.URLError, OSError, KeyError, ValueError) as e:
+    except (swarm.Failed, GitError, workers.WorkerError, subprocess.TimeoutExpired, urllib.error.URLError, OSError, KeyError, ValueError) as e:
         status, reason = "failed", lib.redact("%s: %s" % (type(e).__name__, e))[:200]
     except swarm.Capped as e:
         status, reason = "capped", str(e)
