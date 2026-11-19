@@ -122,7 +122,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 
 ### Going live (the owner's steps)
 
-1. Create a fine-grained token (or a GitHub App installation token) limited to the single `claude-specter` repository: Contents read/write, Pull requests read/write, Metadata read. No Administration, no Workflows, 90-day expiry.
+1. Create a fine-grained token (or a GitHub App installation token) for all repositories: Contents read/write, Pull requests read/write, Metadata read. No Administration, no Workflows. The current token expires 2027-02-14. Because the token reaches every repository, the isolation guard (`NIGHTLY_ALLOWED_REPOS` for the nightly job, `SWARM_ALLOWED_REPOS` for the swarm) is what limits where the jobs may write.
 2. Encrypt it. Write a `Secret` named `hermes-github` in namespace `hermes` with `stringData.token`, then `sops --encrypt --filename-override deploy/secrets/hermes-github.sops.yaml <file> > deploy/secrets/hermes-github.sops.yaml`, delete the plaintext file, add the new file to `deploy/secrets/kustomization.yaml`, run `bash scripts/check-sops.sh`, commit. Never commit the plaintext.
 3. Set `NIGHTLY_REPO=owner/name` in `deploy/hermes/kustomization.yaml` (`nightly-specter-env`). Point it at a **throwaway fork** first.
 4. After the merge reconciles, delete the hermes pod (a `rollout restart` is reverted by Flux) and check the pod is Ready.
