@@ -84,15 +84,15 @@ swarm-preflight: ## Spec 13: tools, state dir, Haiku wrapper, chat reachability,
 	@$(HERMES) bash $(SWARM) --preflight $(QUIET)
 
 swarm-plan: ## Spec 13 dry run: print the plan for TASK (default swarm-example); no worker call, spends nothing
-	@t="$${TASK:-swarm-example}"; \
+	@t="$${TASK:-swarm-example}"; [ -f "deploy/hermes/jobs/$$t/task.yaml" ] || t="swarm-$$t"; \
 	 if [ -f "deploy/hermes/jobs/$$t/task.yaml" ]; then f="/opt/jobs/$$t/task.yaml"; \
-	 else echo "usage: make swarm-plan TASK=<name under deploy/hermes/jobs/>"; exit 2; fi; \
+	 else echo "usage: make swarm-plan TASK=<name under deploy/hermes/jobs/, with or without the swarm- prefix>"; exit 2; fi; \
 	 $(HERMES) env "SWARM_ORCHESTRATOR=$$SWARM_ORCHESTRATOR" bash $(SWARM) "$$f" --dry-run $(QUIET)
 
 swarm-run: ## Spec 13: run TASK (default swarm-example) in the pod in the background, log under /opt/data/swarm
-	@t="$${TASK:-swarm-example}"; \
+	@t="$${TASK:-swarm-example}"; [ -f "deploy/hermes/jobs/$$t/task.yaml" ] || t="swarm-$$t"; \
 	 if [ -f "deploy/hermes/jobs/$$t/task.yaml" ]; then f="/opt/jobs/$$t/task.yaml"; \
-	 else echo "usage: make swarm-run TASK=<name under deploy/hermes/jobs/>"; exit 2; fi; \
+	 else echo "usage: make swarm-run TASK=<name under deploy/hermes/jobs/, with or without the swarm- prefix>"; exit 2; fi; \
 	 $(HERMES) env "SWARM_ORCHESTRATOR=$$SWARM_ORCHESTRATOR" "SWARM_HAIKU_PARALLEL=$$SWARM_HAIKU_PARALLEL" "F=$$f" "N=$$t" sh -c 'mkdir -p $(SWSTATE) && ( nohup bash $(SWARM) "$$F" > "$(SWSTATE)/$$N.log" 2>&1 & ); sleep 2; echo "started; log: $(SWSTATE)/$$N.log"' $(QUIET)
 
 swarm-status: ## Spec 13: running or not, last audit entries, digest, metrics, Haiku calls used today

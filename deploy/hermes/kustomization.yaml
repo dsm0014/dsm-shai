@@ -37,6 +37,8 @@ configMapGenerator:
       - route.py=jobs/swarm/route.py
       - verifiers.py=jobs/swarm/verifiers.py
       - workers.py=jobs/swarm/workers.py
+      - repo_work.py=jobs/swarm/repo_work.py
+      - pick_task.py=jobs/swarm/pick_task.py
       - run.sh=jobs/swarm/run.sh
       - prompt-plan=jobs/swarm/prompts/plan.v1.txt
       - prompt-worker=jobs/swarm/prompts/worker.v1.txt
@@ -46,11 +48,16 @@ configMapGenerator:
       - template-task=jobs/swarm-template/task.example.yaml
       - template-run=jobs/swarm-template/run.sh
       - template-register=jobs/swarm-template/register-cron.sh
+      - repowork-task=jobs/swarm-repo-work/task.yaml
+      - repowork-run=jobs/swarm-repo-work/run.sh
+      - repowork-register=jobs/swarm-repo-work/register-cron.sh
   # Spec 13 settings. SWARM_ALLOWED_REPOS is the fail-closed repo allowlist (empty means every task is refused).
   - name: swarm-env
     literals:
       - SWARM_ALLOWED_REPOS=dsm0014/dsm-shai
       - SWARM_HAIKU_PARALLEL=2
+      # Spec 14: the repo-work job does nothing unless this is 1. Flip it in a reviewed PR when you want it live.
+      - SWARM_REPO_WORK=0
   # Spec 12: Claude Haiku through the Claude Code CLI (subscription), mounted read-only at /opt/jobs/claude-haiku.
   - name: hermes-claude-haiku
     files:

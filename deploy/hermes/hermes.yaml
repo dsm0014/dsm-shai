@@ -147,6 +147,7 @@ spec:
             - {name: swarm-job, mountPath: /opt/jobs/swarm, readOnly: true}
             - {name: swarm-example-job, mountPath: /opt/jobs/swarm-example, readOnly: true}
             - {name: swarm-template-job, mountPath: /opt/jobs/swarm-template, readOnly: true}
+            - {name: swarm-repo-work-job, mountPath: /opt/jobs/swarm-repo-work, readOnly: true}
         - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
@@ -191,6 +192,8 @@ spec:
               - {key: route.py, path: route.py}
               - {key: verifiers.py, path: verifiers.py}
               - {key: workers.py, path: workers.py}
+              - {key: repo_work.py, path: repo_work.py}
+              - {key: pick_task.py, path: pick_task.py}
               - {key: run.sh, path: run.sh}
               - {key: prompt-plan, path: prompts/plan.v1.txt}
               - {key: prompt-worker, path: prompts/worker.v1.txt}
@@ -202,6 +205,14 @@ spec:
               - {key: example-task, path: task.yaml}
               - {key: example-run, path: run.sh}
               - {key: example-register, path: register-cron.sh}
+        - name: swarm-repo-work-job            # spec 14 autonomous repo work job (paused until SWARM_REPO_WORK=1)
+          configMap:
+            name: hermes-swarm
+            defaultMode: 0555
+            items:
+              - {key: repowork-task, path: task.yaml}
+              - {key: repowork-run, path: run.sh}
+              - {key: repowork-register, path: register-cron.sh}
         - name: swarm-template-job             # spec 13 template for new jobs
           configMap:
             name: hermes-swarm

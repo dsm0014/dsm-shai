@@ -1,6 +1,8 @@
 # Spec 14 — Autonomous Repo Work via the Swarm
 
-**Status:** TODO
+**Status:** IN PROGRESS
+
+> **Amendments made while building (2026-11-19):** (1) workers return the complete new content of one file in a fenced block, not a diff: a 9B model writes unified diffs unreliably. The script writes the file, derives the diff with `git diff` and enforces `allowed_paths`, the forbidden list and the caps on that real diff (`diff_allowed` stays for diff-producing steps). (2) "Check off the task" means removing its line from the task list, per the repo convention that the list holds only work still to do. (3) The job lives in `deploy/hermes/jobs/swarm-repo-work/` (`make swarm-plan TASK=repo-work` resolves the `swarm-` prefix) and the code in `deploy/hermes/jobs/swarm/` (`pick_task.py`, `repo_work.py`, dispatched by `kind: repo_work`). (4) `SWARM_REPO_WORK` is `0` in the `swarm-env` ConfigMap until the owner flips it in a reviewed PR.
 
 ## Purpose
 
@@ -24,9 +26,9 @@ Let the Hermes swarm (spec 13) work through this repository's task list unattend
 **Flow**
 1. Preflight (`make swarm-preflight`), disabled flags, `hermes pause` check, allowlist, open-PR check, then `pick-task.py`.
 2. Clone the repo into `/workspace`, branch `swarm/<date>-<task-slug>` from the default branch.
-3. Plan with the orchestrator (spec 13), steps limited to the derived files. Workers return diffs; scripts apply each with `git apply --check` first. Haiku handles `hard` steps and escalations, Qwen the bounded ones.
+3. Plan with the orchestrator (spec 13), steps limited to the derived files. Each step edits exactly one listed file and returns its complete new content; scripts write it and check the resulting diff. Haiku handles `hard` steps and escalations, Qwen the bounded ones.
 4. Verify with scripts only: diff inside `allowed_paths`, line and file caps, no forbidden path, `scripts/check-sops.sh` clean, and the repo's offline tests (`make test` where present, plus any command named in the task) exit 0. A failed step follows the spec 13 retry ladder, then the run ends `failed` and the branch is deleted.
-5. Check off the task in `.specter/tasklist.md` only in the same commit that completes it; open the pull request with the task text, files changed, the verifier results, Haiku call count and run ID, the label `swarm`, and no auto-merge.
+5. Remove the task from `.specter/tasklist.md` in the same commit that completes it; open the pull request with the task text, files changed, the verifier results, Haiku call count and run ID, the label `swarm`, and no auto-merge.
 
 **Observability and control**
 - Audit, digest and metrics reuse spec 13 (`swarm_last_run_status` and the new `swarm_prs_opened_total`). Each run writes a digest line with the pull request URL or the skip or failure reason.

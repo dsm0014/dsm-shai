@@ -1,0 +1,11 @@
+# Autonomous repo work (spec 14). The swarm picks the first `[swarm]` task in the target repo's .specter/tasklist.md, edits only the
+# files named in that task, runs the repo's tests and opens a pull request. It never merges. Needs SWARM_REPO_WORK=1 and the repo in
+# SWARM_ALLOWED_REPOS. Registered paused.
+name: repo-work
+kind: repo_work
+repo: dsm0014/dsm-shai
+goal: Complete the next [swarm] task from the repository task list.
+max_steps: 6
+max_haiku_calls: 8
+timeout_minutes: 60
+min_chars: 20

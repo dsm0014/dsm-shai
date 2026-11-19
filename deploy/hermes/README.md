@@ -213,6 +213,16 @@ Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps
 
 **New job from the template:** copy `deploy/hermes/jobs/swarm-template/` to `deploy/hermes/jobs/swarm-<name>/`, edit `task.yaml`, add its files to the `hermes-swarm` generator in `kustomization.yaml` and a volume and mount in `hermes.yaml` (same as `swarm-example`), add the repo to `SWARM_ALLOWED_REPOS`, test with `make swarm-plan TASK=swarm-<name>`, then `register-cron.sh <name>` (prints the paused `hermes cron create` command; `--apply` writes a wrapper into `/opt/data/scripts/`, which is the only place Hermes accepts a `--script` from, and runs it) and `hermes cron resume <id>` when ready.
 
+## Autonomous repo work (spec 14)
+
+The swarm can work through the target repo's task list and open pull requests. **It never merges.** Job: `deploy/hermes/jobs/swarm-repo-work/` (task `repo-work`); code: `pick_task.py` and `repo_work.py` next to the swarm engine.
+
+**Queue a task:** in `.specter/tasklist.md` put `[swarm]` after the checkbox and name the files in backticks: `- [ ] [swarm] Add a make hermes-task example to `deploy/hermes/README.md``. Unqueue it by deleting the marker. Never picked: unmarked items, `[~]` started items, `[needs-owner]`, and anything under "Needs you at the machine", "Proposed, not decided" or "Not planned". Items with no file list are skipped with a digest line. `[swarm-deploy]` is required for manifests (`deploy/**/*.yaml`), mesh and egress config; those PRs get the `needs-careful-review` label.
+
+**Guards (fail closed):** `SWARM_REPO_WORK=1` (ConfigMap `swarm-env`, default `0`), the repo in `SWARM_ALLOWED_REPOS`, no open PR from a `swarm/` branch, one PR per run and per day, at most `SWARM_MAX_FILES` (6) files and `SWARM_MAX_LINES` (300) changed lines, and the kill switches of the swarm. Never editable: `.github/`, `ci/`, `deploy/secrets/`, `*.sops.yaml`, `CLAUDE.md`, `deploy/hermes/jobs/swarm*`, `deploy/hermes/jobs/claude-haiku`. Workers have no token and no shell: the script clones through the proxy, writes the files a worker returns, runs `make test` (and `scripts/check-sops.sh`), commits, pushes branch `swarm/<date>-<slug>` and opens the PR through the REST API. A failure deletes the work directory and pushes nothing.
+
+**Run:** `make swarm-plan TASK=repo-work` (dry run: the picked task, derived `allowed_paths` and a scripted plan; no worker call, clone, push or PR), `make swarm-run TASK=repo-work`, `make swarm-status`. Register the cron entry paused with `register-cron.sh repo-work --apply`.
+
 ## Claude Haiku through the Claude Code CLI (spec 12)
 
 Haiku runs on your Claude subscription, not the API. No API key exists anywhere; `claude-haiku.sh` unsets `ANTHROPIC_API_KEY` before each call and `make claude-haiku-preflight` fails if one is set.
