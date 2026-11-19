@@ -17,7 +17,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | PARTIAL | Built, merged and running inert (proxy and preflight verified in the cluster). Open: GitHub token, `hermes pause` test, fork rehearsal, cron entry, go-live |
 | 12 | [Claude Haiku via Claude Code CLI](./12-anthropic-litellm-key.md) | IN PROGRESS | Live: image, token, wrapper call and proxy path verified 2026-11-18. Egress gap closed with litellm and openviking egress policies; wrapper offline tests pass. Open: the Anthropic console API-usage check, LiteLLM vision regression check, and egress policies for ollama, monitoring and istio-system. Subscription only, no API key |
 | 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | DONE | Every criterion verified live 2026-11-19; the `swarm-example` cron entry is registered paused |
-| 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | TODO | Not started; builds on specs 11, 12 and 13 |
+| 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | IN PROGRESS | Built and live-verified on this repo (7 merged swarm PRs). Open: rehearsal-repo run (skipped), `make swarm-plan TASK=repo-work` and `skipped: pr open` live, `SWARM_REPO_WORK=1` flip |
 | 15 | [Hermes on Discord, Swarm Commands and Haiku Web Research](./15-hermes-discord.md) | IN PROGRESS | Egress (restricted and open-web proxy listeners) and the Haiku research mode are built and tested offline. Open: Squid check in Docker and in the cluster, research live check, the whole Discord side (secret, gateway, `quick_commands`, `swarm-chat.sh`, digest cron) |
 
 ## Measured footprint (2026-11-16)
