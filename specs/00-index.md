@@ -19,7 +19,6 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | IN PROGRESS | Engine, tests, manifests and docs built; offline criteria pass. Open: live `swarm-example` run, no-429 and Anthropic-blocked live checks, cron registered paused, `make swarm-*` in the pod |
 | 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | TODO | Not started; builds on specs 11, 12 and 13 |
 | 15 | [Hermes on Discord, Swarm Commands and Haiku Web Research](./15-hermes-discord.md) | IN PROGRESS | Egress (restricted and open-web proxy listeners) and the Haiku research mode are built and tested offline. Open: Squid check in Docker and in the cluster, research live check, the whole Discord side (secret, gateway, `quick_commands`, `swarm-chat.sh`, digest cron) |
-| 16 | [Hermes Dashboard Exposure](./16-hermes-dashboard.md) | TODO | Not started; amends spec 05's no-Hermes-ingress rule |
 
 ## Measured footprint (2026-11-16)
 
