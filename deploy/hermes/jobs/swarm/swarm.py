@@ -206,7 +206,8 @@ class Run:
         local_failures, prev = 0, None
         names = list(self.task.get("verifiers") or []) + (["cites_inputs"] if step.get("inputs") else [])
         ctx = {"input_ids": (step.get("inputs") or []), "min_chars": self.task.get("min_chars", 40),
-               "allowed_paths": self.task.get("allowed_paths", []), "max_chars": self.task.get("max_chars", 8000)}
+               "allowed_paths": self.task.get("allowed_paths", []), "max_chars": self.task.get("max_chars", 8000),
+               "orig_len": step.get("orig_len"), "min_keep_pct": step.get("min_keep_pct", 70)}
         prompt = self.step_prompt(step, items)
         for attempt in (1, 2, 3):
             tier = route.route(step["tag"], local_failures, self.orch)

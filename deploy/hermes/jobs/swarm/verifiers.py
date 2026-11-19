@@ -50,6 +50,20 @@ def v_diff_allowed(text, ctx):
     return (changed <= int(ctx.get("max_diff_lines", 200)), "diff over the line cap")
 
 
+def v_keeps_size(text, ctx):
+    """A whole-file answer must keep most of the original's size; a snippet or a cut-down file fails and is retried, then escalated."""
+    orig = ctx.get("orig_len")
+    if not orig:
+        return (True, "")
+    import re as _re
+    m = _re.search(r"^```[^\n]*\n", text, _re.M)
+    end = text.rfind("\n```")
+    body = text[m.end():end] if m and end >= m.end() - 1 else ""
+    keep = int(ctx.get("min_keep_pct", 70))
+    pct = len(body) * 100 // max(1, int(orig))
+    return (pct >= keep, "returned %d%% of the file's size (need %d%%); return the WHOLE file, every unchanged line included" % (pct, keep))
+
+
 def v_file_block(text, ctx):
     """A file-writing step must answer with one fenced block holding the whole new file."""
     import re as _re
@@ -61,7 +75,7 @@ def v_file_block(text, ctx):
     return (len(body.splitlines()) <= int(ctx.get("max_file_lines", 2000)), "file block too long")
 
 
-TABLE = {"file_block": v_file_block, "nonempty": v_nonempty, "min_chars": v_min_chars, "max_chars": v_max_chars, "json": v_json,
+TABLE = {"file_block": v_file_block, "keeps_size": v_keeps_size, "nonempty": v_nonempty, "min_chars": v_min_chars, "max_chars": v_max_chars, "json": v_json,
          "no_secrets": v_no_secrets, "cites_inputs": v_cites_inputs, "diff_allowed": v_diff_allowed}
 DEFAULT = ["nonempty", "no_secrets"]
 
