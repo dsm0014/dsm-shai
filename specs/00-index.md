@@ -16,7 +16,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 10 | [GitOps with Flux](./10-flux-gitops.md) | PARTIAL | CI secret scan stays inactive (the `workflow` token scope is not added; the pre-commit scan is active); everything else per `.specter/archive/tasklist-specs-01-10-2026-11-16.md` step 2 |
 | 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | PARTIAL | Built, merged and running inert (proxy and preflight verified in the cluster). Open: GitHub token, `hermes pause` test, fork rehearsal, cron entry, go-live |
 | 12 | [Claude Haiku via Claude Code CLI](./12-anthropic-litellm-key.md) | IN PROGRESS | Live: image, token, wrapper call and proxy path verified 2026-11-18. Egress gap closed with litellm and openviking egress policies; wrapper offline tests pass. Open: the Anthropic console API-usage check, LiteLLM vision regression check, and egress policies for ollama, monitoring and istio-system. Subscription only, no API key |
-| 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | TODO | Reconciled with spec 12 (2026-11-18); not yet implemented |
+| 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | IN PROGRESS | Engine, tests, manifests and docs built; offline criteria pass. Open: live `swarm-example` run, no-429 and Anthropic-blocked live checks, cron registered paused, `make swarm-*` in the pod |
 | 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | TODO | Not started; builds on specs 11, 12 and 13 |
 
 ## Measured footprint (2026-11-16)

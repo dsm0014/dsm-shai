@@ -28,6 +28,29 @@ configMapGenerator:
       - prompt-a-vectors=jobs/nightly-specter/prompts/a-vectors.v1.txt
       - prompt-a-spec=jobs/nightly-specter/prompts/a-spec.v1.txt
       - prompt-b-implement=jobs/nightly-specter/prompts/b-implement.v1.txt
+  # Spec 13 swarm: engine and prompts at /opt/jobs/swarm, the example job at /opt/jobs/swarm-example, the template at
+  # /opt/jobs/swarm-template (all read-only). Tests stay out.
+  - name: hermes-swarm
+    files:
+      - swarm.py=jobs/swarm/swarm.py
+      - lib.py=jobs/swarm/lib.py
+      - route.py=jobs/swarm/route.py
+      - verifiers.py=jobs/swarm/verifiers.py
+      - workers.py=jobs/swarm/workers.py
+      - run.sh=jobs/swarm/run.sh
+      - prompt-plan=jobs/swarm/prompts/plan.v1.txt
+      - prompt-worker=jobs/swarm/prompts/worker.v1.txt
+      - example-task=jobs/swarm-example/task.yaml
+      - example-run=jobs/swarm-example/run.sh
+      - example-register=jobs/swarm-example/register-cron.sh
+      - template-task=jobs/swarm-template/task.example.yaml
+      - template-run=jobs/swarm-template/run.sh
+      - template-register=jobs/swarm-template/register-cron.sh
+  # Spec 13 settings. SWARM_ALLOWED_REPOS is the fail-closed repo allowlist (empty means every task is refused).
+  - name: swarm-env
+    literals:
+      - SWARM_ALLOWED_REPOS=dsm0014/dsm-shai
+      - SWARM_HAIKU_PARALLEL=2
   # Spec 12: Claude Haiku through the Claude Code CLI (subscription), mounted read-only at /opt/jobs/claude-haiku.
   - name: hermes-claude-haiku
     files:

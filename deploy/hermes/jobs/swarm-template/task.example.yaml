@@ -1,0 +1,19 @@
+# Swarm task template (spec 13). Copy to a new directory under deploy/hermes/jobs/ and edit. Parsed by a restricted YAML subset:
+# top-level `key: value`, block lists (`- item`), and JSON for anything nested. Every field is described in README.md.
+name: my-task
+repo: owner/name              # must be listed in SWARM_ALLOWED_REPOS or the task is refused before any call
+goal: Describe the outcome in one or two sentences; the orchestrator splits it into steps.
+source:                       # optional inputs fetched before planning
+  type: github_changes
+  commits: 5
+  max_items: 6
+allowed_paths:                # paths a diff-producing step may touch (steps are text-only unless the verifier list says otherwise)
+  - docs/
+max_steps: 8
+max_haiku_calls: 6            # every wrapper call counts: the plan, hard steps, escalations
+timeout_minutes: 30
+verifiers:
+  - min_chars
+  - max_chars
+min_chars: 60
+max_chars: 6000

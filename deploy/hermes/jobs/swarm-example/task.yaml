@@ -1,0 +1,18 @@
+# Daily repo digest (spec 13 example). Local workers summarise each changed file, one Haiku step merges the summaries,
+# the report is stored in OpenViking. Writes nothing outside /opt/data/swarm.
+name: swarm-example
+repo: dsm0014/dsm-shai
+goal: Write a short digest (under 200 words) of what changed in the repository in its most recent commits, grouped by theme.
+source:
+  type: github_changes
+  commits: 5
+  max_items: 6
+allowed_paths: []
+max_steps: 8
+max_haiku_calls: 4
+timeout_minutes: 40
+verifiers:
+  - min_chars
+  - max_chars
+min_chars: 40
+max_chars: 4000

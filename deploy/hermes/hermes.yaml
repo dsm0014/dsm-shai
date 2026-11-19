@@ -121,6 +121,9 @@ spec:
             - configMapRef:
                 name: nightly-specter-env       # NIGHTLY_REPO and the job limits; repo is empty until configured
                 optional: true
+            - configMapRef:
+                name: swarm-env                 # spec 13: SWARM_ALLOWED_REPOS (fail closed when empty) and SWARM_HAIKU_PARALLEL
+                optional: true
           resources:
             requests:
               cpu: 500m
@@ -141,6 +144,9 @@ spec:
             - name: claude-haiku-job
               mountPath: /opt/jobs/claude-haiku
               readOnly: true
+            - {name: swarm-job, mountPath: /opt/jobs/swarm, readOnly: true}
+            - {name: swarm-example-job, mountPath: /opt/jobs/swarm-example, readOnly: true}
+            - {name: swarm-template-job, mountPath: /opt/jobs/swarm-template, readOnly: true}
         - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
@@ -175,6 +181,35 @@ spec:
           configMap:
             name: hermes-claude-haiku
             defaultMode: 0555
+        - name: swarm-job                      # spec 13 engine, read-only; prompts are mapped into prompts/
+          configMap:
+            name: hermes-swarm
+            defaultMode: 0555
+            items:
+              - {key: swarm.py, path: swarm.py}
+              - {key: lib.py, path: lib.py}
+              - {key: route.py, path: route.py}
+              - {key: verifiers.py, path: verifiers.py}
+              - {key: workers.py, path: workers.py}
+              - {key: run.sh, path: run.sh}
+              - {key: prompt-plan, path: prompts/plan.v1.txt}
+              - {key: prompt-worker, path: prompts/worker.v1.txt}
+        - name: swarm-example-job              # spec 13 example job (runnable instance of the template)
+          configMap:
+            name: hermes-swarm
+            defaultMode: 0555
+            items:
+              - {key: example-task, path: task.yaml}
+              - {key: example-run, path: run.sh}
+              - {key: example-register, path: register-cron.sh}
+        - name: swarm-template-job             # spec 13 template for new jobs
+          configMap:
+            name: hermes-swarm
+            defaultMode: 0555
+            items:
+              - {key: template-task, path: task.example.yaml}
+              - {key: template-run, path: run.sh}
+              - {key: template-register, path: register-cron.sh}
         - name: nightly-jobs                   # spec 11 job scripts, read-only; prompts are mapped into prompts/
           configMap:
             name: hermes-nightly-specter

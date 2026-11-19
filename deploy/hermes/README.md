@@ -178,6 +178,39 @@ kubectl -n hermes exec deploy/hermes -- sh -c 'hermes -z "..."'                 
 kubectl -n hermes exec deploy/hermes -- sh -c 'hermes logs | grep tool'          # tool activity
 ```
 
+## Swarm orchestration (spec 13)
+
+Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps, and scripts own routing, caps and verification. Engine: `deploy/hermes/jobs/swarm/` (mounted at `/opt/jobs/swarm`); example job `swarm-example` (daily repo digest); template `swarm-template`. State: `/opt/data/swarm/` (`audit.jsonl`, `digest.log`, `metrics.prom`, `runs/<id>/`, `locks/`).
+
+| Role | Who | Notes |
+|---|---|---|
+| Orchestrator | Haiku through `claude-haiku.sh` (`SWARM_ORCHESTRATOR=chat` makes it local) | Writes a plan of at most 12 steps; never edits files or runs commands |
+| Worker `normal` | `chat` through LiteLLM (`hermes` key) | At most 2 in flight (LiteLLM `max_parallel_requests: 2`); the scheduler queues, 429s are never used as flow control |
+| Worker `hard` or escalated | Haiku wrapper | At most `SWARM_HAIKU_PARALLEL` (default 2, must not exceed the wrapper's `CLAUDE_HAIKU_PARALLEL`) |
+
+**Routing** (`route.py`, no model input): `hard` goes to Haiku; `normal` goes to `chat`; after two local verifier failures a step goes to Haiku; with `SWARM_ORCHESTRATOR=chat` everything stays local. **Retry ladder:** same tier once, next tier once, then the task fails and uncommitted work is discarded. Only a non-LLM verifier result counts as success.
+
+**Caps** (any of them ends the run `capped`, never a retry loop): `max_steps`, `max_haiku_calls` (every wrapper call counts), `timeout_minutes`, the wrapper's daily cap (`CLAUDE_HAIKU_DAILY_CALLS`, shared with every Haiku caller), one run per task name (`skipped: locked`). Haiku tokens and cost are not metered on a subscription; the audit records calls and bytes (local token counts come from the LiteLLM `usage` field).
+
+**Fail closed:** a task's `repo` must be in `SWARM_ALLOWED_REPOS` (ConfigMap `swarm-env`, currently `dsm0014/dsm-shai`); anything else, or an empty list, is refused with exit 2 before any call. Fetched content is wrapped in `UNTRUSTED_CONTENT` markers.
+
+**Kill switches:** `make hermes-pause` (the `ESTOP` file), `touch /opt/data/swarm/disabled`, `touch /opt/data/claude-haiku/disabled` (stops every Haiku call; the run ends `capped`), `make swarm-stop`.
+
+**Task file** (restricted YAML: `key: value`, block lists, one nested map, JSON values):
+
+| Field | Meaning |
+|---|---|
+| `name`, `goal` | Required. The goal is what the orchestrator plans against |
+| `repo` | Target repo, checked against `SWARM_ALLOWED_REPOS` |
+| `source` | `{type: github_changes, commits, max_items}`: changed files of the latest commits become the inputs (public repo, unauthenticated, through the proxy) |
+| `allowed_paths` | Paths a diff-producing step may touch (`diff_allowed` verifier) |
+| `max_steps`, `max_haiku_calls`, `timeout_minutes` | The caps above |
+| `verifiers`, `min_chars`, `max_chars` | Extra verifiers for every step. Always on: `nonempty`, `no_secrets`, and `cites_inputs` for a step with inputs. Others: `json`, `diff_allowed` |
+
+**Make targets:** `swarm-preflight`, `swarm-plan TASK=<name>` (dry run: a scripted plan, no model call, spends nothing; a live run asks the orchestrator), `swarm-run TASK=<name>` (background, log at `/opt/data/swarm/<name>.log`; `SWARM_ORCHESTRATOR=chat` and `SWARM_HAIKU_PARALLEL=n` pass through), `swarm-status`, `swarm-stop`, `swarm-test` (offline).
+
+**New job from the template:** copy `deploy/hermes/jobs/swarm-template/` to `deploy/hermes/jobs/swarm-<name>/`, edit `task.yaml`, add its files to the `hermes-swarm` generator in `kustomization.yaml` and a volume and mount in `hermes.yaml` (same as `swarm-example`), add the repo to `SWARM_ALLOWED_REPOS`, test with `make swarm-plan TASK=swarm-<name>`, then `register-cron.sh <name>` (prints the paused `hermes cron create` command; `--apply` runs it) and `hermes cron resume <id>` when ready.
+
 ## Claude Haiku through the Claude Code CLI (spec 12)
 
 Haiku runs on your Claude subscription, not the API. No API key exists anywhere; `claude-haiku.sh` unsets `ANTHROPIC_API_KEY` before each call and `make claude-haiku-preflight` fails if one is set.
