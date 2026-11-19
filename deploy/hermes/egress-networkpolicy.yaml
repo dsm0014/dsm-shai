@@ -35,7 +35,8 @@ spec:
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: egress-proxy}
       ports:
-        - {protocol: TCP, port: 3128}   # spec 11: the GitHub-only proxy, used by the nightly job only
+        - {protocol: TCP, port: 3128}   # spec 11: the restricted proxy listener (GitHub, Anthropic, Discord); pod-wide default
+        - {protocol: TCP, port: 3129}   # spec 15: the open-web research listener, used by claude-haiku.sh with CLAUDE_HAIKU_WEB=1
     - to:
         - ipBlock: {cidr: 0.0.0.0/0}
       ports:

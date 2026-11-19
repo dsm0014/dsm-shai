@@ -35,6 +35,7 @@ spec:
           command: ["squid", "-N", "-f", "/etc/squid/squid.conf"]
           ports:
             - {name: proxy, containerPort: 3128}
+            - {name: research, containerPort: 3129}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -70,3 +71,4 @@ spec:
   selector: {app.kubernetes.io/name: squid}
   ports:
     - {name: proxy, port: 3128, targetPort: proxy}
+    - {name: research, port: 3129, targetPort: research}

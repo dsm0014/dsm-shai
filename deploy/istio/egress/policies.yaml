@@ -15,7 +15,7 @@ spec:
     - from:
         - source: {principals: ["cluster.local/ns/hermes/sa/hermes"]}
       to:
-        - operation: {ports: ["3128"]}
+        - operation: {ports: ["3128", "3129"]}   # 3129: open-web research listener, used by claude-haiku.sh only (spec 15)
 ---
 # The proxy itself may only reach DNS and 443 on the internet. It must not reach cluster services.
 apiVersion: networking.k8s.io/v1
