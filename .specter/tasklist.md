@@ -31,7 +31,6 @@ Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11
 
 The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
 
-- [ ] [swarm] **Spec 10:** in `specs/10-flux-gitops.md` fix the spec 11 amendment that says the hermes namespace holds a single-repository token: it now holds a fine-grained token for all repositories (Contents and Pull requests read/write, Metadata read; no Administration, no Workflows).
 - [ ] **`deploy/hermes/README.md` (step 1 of the GitHub token section):** same wording fix (all repositories, not a single repository). The file is too large for a swarm worker to see whole, so do this one by hand.
 
 ## 3. Real work I can do without you
