@@ -25,7 +25,9 @@ def forbidden(path):
 
 def deploy_class(path):
     """Manifests, mesh or egress config: allowed only for tasks marked [swarm-deploy]."""
-    return (path.startswith("deploy/") and path.endswith((".yaml", ".yml"))) or "istio" in path or "egress" in path or "networkpolicy" in path.lower()
+    if not path.startswith("deploy/"):
+        return False  # specs, docs and the task list are never deploy config, even when their name says "istio"
+    return path.endswith((".yaml", ".yml")) or "istio" in path or "egress" in path or "networkpolicy" in path.lower()
 
 
 class Refused(Exception):

@@ -535,3 +535,15 @@ class ExtractBlock(unittest.TestCase):
         self.assertEqual(repo_work.extract_block("```\nx\n```"), "x\n")
         self.assertEqual(repo_work.extract_block("Sure!\n```markdown\n# H\n```\nDone."), "# H\n")
         self.assertIsNone(repo_work.extract_block("no fence here"))
+
+
+class DeployClass(unittest.TestCase):
+    """Live bug 2026-11-19: specs/08-istio-service-mesh.md was refused as deploy config because its name contains 'istio'."""
+
+    def test_specs_and_docs_are_not_deploy_class_even_when_named_istio(self):
+        for p in ("specs/08-istio-service-mesh.md", "docs/egress-notes.md", ".specter/tasklist.md", "README.md"):
+            self.assertFalse(repo_work.deploy_class(p), p)
+
+    def test_manifests_and_mesh_config_under_deploy_still_are(self):
+        for p in ("deploy/foo/bar.yaml", "deploy/istio/README.md", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
+            self.assertTrue(repo_work.deploy_class(p), p)
