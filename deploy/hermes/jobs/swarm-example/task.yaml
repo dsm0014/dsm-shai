@@ -9,7 +9,7 @@ source:
   max_items: 6
 allowed_paths: []
 max_steps: 8
-max_haiku_calls: 4
+max_haiku_calls: 6
 timeout_minutes: 40
 verifiers:
   - min_chars

@@ -254,3 +254,9 @@ class Untrusted(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CitesInputs(unittest.TestCase):
+    def test_basename_counts_as_a_citation(self):
+        self.assertTrue(verifiers.v_cites_inputs("Changed mod.py to add a flag.", {"input_ids": ["src/pkg/mod.py"]})[0])
+        self.assertFalse(verifiers.v_cites_inputs("Changed something.", {"input_ids": ["src/pkg/mod.py"]})[0])

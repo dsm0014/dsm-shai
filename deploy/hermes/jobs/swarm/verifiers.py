@@ -33,7 +33,7 @@ def v_no_secrets(text, ctx):
 
 def v_cites_inputs(text, ctx):
     """A summary must mention each input it was given (by path or id), which catches off-topic output."""
-    missing = [i for i in ctx.get("input_ids", []) if i not in text]
+    missing = [i for i in ctx.get("input_ids", []) if i not in text and i.rsplit("/", 1)[-1] not in text]  # a file name alone is a citation
     return (not missing, "does not mention input %s" % ",".join(missing[:3]))
 
 
