@@ -31,9 +31,9 @@ Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11
 
 The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
 
-- [ ] **Spec 04:** drop the browser MCP tools; reword "an allowlisted web host is reachable" to the Squid proxy's restricted listener (done for the egress prose; the acceptance box is not reworded yet); record that Hermes reaches OpenViking directly, not through the LiteLLM MCP gateway (tool-surface problem with the 9B model).
-- [ ] **Spec 08:** reword the hostname-allowlist criterion to the same GitHub-only proxy for the hermes pod (`REGISTRY_ONLY` does not block unregistered hosts in ambient).
-- [ ] **Spec 10:** reword the CI secret scan criterion to the pre-commit scan only (the `workflow` token scope is not added; the workflow file stays in `ci/`).
+- [ ] [swarm] **Spec 04:** in `specs/04-hermes-agent.md` drop the browser MCP tools; reword "an allowlisted web host is reachable" to the Squid proxy's restricted listener (done for the egress prose; the acceptance box is not reworded yet); record that Hermes reaches OpenViking directly, not through the LiteLLM MCP gateway (tool-surface problem with the 9B model).
+- [ ] [swarm] **Spec 08:** in `specs/08-istio-service-mesh.md` reword the hostname-allowlist criterion to the same GitHub-only proxy for the hermes pod (`REGISTRY_ONLY` does not block unregistered hosts in ambient).
+- [ ] [swarm] **Spec 10:** in `specs/10-flux-gitops.md` reword the CI secret scan criterion to the pre-commit scan only (the `workflow` token scope is not added; the workflow file stays in `ci/`).
 - [ ] **Spec 11 and `deploy/hermes/README.md` (step 1 of the GitHub token section):** the token is now fine-grained for all repositories (Contents and Pull requests read/write, Metadata read; no Administration, no Workflows; expires 2027-02-14), not a single repository. Update the wording, and the spec 10 amendment that says the hermes namespace holds a single-repo token.
 
 ## 3. Real work I can do without you
