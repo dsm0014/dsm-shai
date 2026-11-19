@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsm-shai: infra and feature overview (2026-11-19)</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #171e26; --line: #2a3441; --text: #e6edf3; --muted: #8b98a5;
+    --done: #3fb950; --prog: #d29922; --partial: #58a6ff; --todo: #6e7681; --warn: #f0883e;
+    --accent: #a371f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 32px 0 12px; font-weight: 600; }
+  .sub { color: var(--muted); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 18px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .kpi b { display: block; font-size: 22px; }
+  .kpi span { color: var(--muted); font-size: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+
+  /* architecture */
+  .tier { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: stretch; margin-bottom: 4px; }
+  .tier-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-top: 10px; }
+  .nodes { display: flex; flex-wrap: wrap; gap: 10px; }
+  .node { flex: 1 1 200px; background: #1d2630; border: 1px solid var(--line); border-left: 4px solid var(--todo); border-radius: 8px; padding: 9px 11px; min-width: 180px; }
+  .node h3 { margin: 0 0 3px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .node p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .node.done { border-left-color: var(--done); }
+  .node.prog { border-left-color: var(--prog); }
+  .node.partial { border-left-color: var(--partial); }
+  .node.todo { border-left-color: var(--todo); }
+  .node.ext { border-left-color: var(--accent); border-style: dashed; border-left-style: solid; }
+  .arrow { text-align: center; color: var(--muted); font-size: 16px; margin: 2px 0; padding-left: 162px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #22303c; color: var(--muted); white-space: nowrap; }
+  .tag.done { background: #1b3a25; color: var(--done); }
+  .tag.prog { background: #3d3217; color: var(--prog); }
+  .tag.partial { background: #14314f; color: var(--partial); }
+  .tag.todo { background: #242a31; color: var(--todo); }
+
+  /* spec grid */
+  .specs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .spec { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; border-top: 3px solid var(--todo); }
+  .spec.done { border-top-color: var(--done); }
+  .spec.prog { border-top-color: var(--prog); }
+  .spec.partial { border-top-color: var(--partial); }
+  .spec .n { color: var(--muted); font-size: 12px; }
+  .spec .t { font-weight: 600; margin: 2px 0 6px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  /* bars */
+  .bar { position: relative; height: 26px; background: #0c1116; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin: 8px 0 6px; }
+  .seg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 8px; font-size: 12px; color: #0b0f14; font-weight: 600; white-space: nowrap; overflow: hidden; }
+  .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .two { grid-template-columns: 1fr; } .tier { grid-template-columns: 1fr; } .tier-label { padding-top: 0; } .arrow { padding-left: 0; } }
+
+  /* egress */
+  .egress { display: grid; grid-template-columns: 1fr 60px 1.1fr 60px 1fr; gap: 6px; align-items: center; }
+  .egress .arr { text-align: center; color: var(--muted); font-size: 18px; }
+  .box { background: #1d2630; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px; }
+  .box b { display: block; margin-bottom: 4px; font-size: 13px; }
+  .box ul { margin: 4px 0 0 16px; padding: 0; color: var(--muted); }
+  .box.restricted { border-color: var(--done); }
+  .box.open { border-color: var(--warn); }
+
+  /* open work */
+  .todo-col h3 { font-size: 14px; margin: 0 0 6px; }
+  .todo-col ul { margin: 0 0 14px; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .todo-col li { margin-bottom: 4px; }
+  .todo-col li b { color: var(--text); font-weight: 600; }
+  footer { margin-top: 36px; color: var(--muted); font-size: 12px; }
+  code { background: #0c1116; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>dsm-shai: current state of infra and features</h1>
+<div class="sub">Snapshot 2026-11-19 · branch <code>feat/hermes-discord-egress</code> · source: <code>specs/00-index.md</code>, <code>.specter/tasklist.md</code>, <code>deploy/</code></div>
+
+<div class="kpis">
+  <div class="kpi"><b>15</b><span>specs</span></div>
+  <div class="kpi"><b style="color:var(--done)">2</b><span>DONE (02, 03)</span></div>
+  <div class="kpi"><b style="color:var(--prog)">4</b><span>IN PROGRESS (01, 12, 13, 15)</span></div>
+  <div class="kpi"><b style="color:var(--partial)">8</b><span>PARTIAL (04 to 11)</span></div>
+  <div class="kpi"><b style="color:var(--todo)">1</b><span>TODO (14)</span></div>
+  <div class="kpi"><b>9.7 / 16</b><span>GiB VRAM in use (chat + embed)</span></div>
+</div>
+
+<h2>Architecture</h2>
+<div class="panel">
+  <div class="tier">
+    <div class="tier-label">Clients</div>
+    <div class="nodes">
+      <div class="node ext"><h3>Windows browser / LAN <span class="tag todo">unverified</span></h3><p>Reaches <code>open-webui.localhost</code> via Istio ingress</p></div>
+      <div class="node ext"><h3>Discord <span class="tag prog">not built</span></h3><p>Outbound only, owner allowlist (spec 15)</p></div>
+      <div class="node ext"><h3>Claude Code CLI <span class="tag partial">in pod</span></h3><p>Haiku on the owner's subscription, no API key (spec 12)</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="tier">
+    <div class="tier-label">Ingress and apps</div>
+    <div class="nodes">
+      <div class="node partial"><h3>Istio ingress gateway <span class="tag partial">PARTIAL</span></h3><p>Single entry point; Traefik disabled</p></div>
+      <div class="node partial"><h3>Open WebUI <span class="tag partial">PARTIAL</span></h3><p>namespace <code>open-webui</code>; egress: LiteLLM + DNS</p></div>
+      <div class="node partial"><h3>Hermes Agent <span class="tag partial">PARTIAL</span></h3><p>namespace <code>hermes</code>; local 9B chat + Haiku wrapper; swarm engine built (13)</p></div>
+      <div class="node done"><h3>OpenViking <span class="tag done">DONE</span></h3><p>namespace <code>openviking</code>; agent context and memory DB</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="tier">
+    <div class="tier-label">Gateway</div>
+    <div class="nodes">
+      <div class="node partial"><h3>LiteLLM <span class="tag partial">PARTIAL</span></h3><p>Sole caller of Ollama; per-consumer virtual keys; no Anthropic provider</p></div>
+      <div class="node partial"><h3>Postgres <span class="tag partial">in LiteLLM ns</span></h3><p>Virtual keys; restore drill pending (spec 07)</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="tier">
+    <div class="tier-label">Inference</div>
+    <div class="nodes">
+      <div class="node done"><h3>Ollama on RTX 4080 <span class="tag done">DONE</span></h3><p>namespace <code>ollama</code>; chat <code>qwen3.5:9b</code> at 64K, embed, VLM; keep-alive swap</p></div>
+      <div class="node done"><h3>NVIDIA device plugin <span class="tag done">DONE</span></h3><p>namespace <code>nvidia-device-plugin</code>; runtime class nvidia</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="tier">
+    <div class="tier-label">Platform</div>
+    <div class="nodes">
+      <div class="node partial"><h3>Istio ambient <span class="tag partial">PARTIAL</span></h3><p>mTLS, authz, ~250 MiB; mesh metrics open</p></div>
+      <div class="node partial"><h3>Flux GitOps <span class="tag partial">PARTIAL</span></h3><p>13 stages, dependsOn order, SOPS in-cluster; CI secret scan off</p></div>
+      <div class="node partial"><h3>Monitoring <span class="tag partial">PARTIAL</span></h3><p>Prometheus, Grafana, GPU exporter (<code>nvidia-smi</code>); ~1.15 GiB; alert fire tests open</p></div>
+      <div class="node partial"><h3>Backup and secrets <span class="tag partial">PARTIAL</span></h3><p>restic + systemd timer; SOPS ciphertext only; restore drills open</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="tier">
+    <div class="tier-label">Host</div>
+    <div class="nodes">
+      <div class="node partial"><h3>Windows 11 + WSL2 + k3s <span class="tag partial">PARTIAL</span></h3><p>i7-13700KF · 32 GB host (WSL default ~15 GB) · ext4 volume for PVCs (C: is 90% full)</p></div>
+    </div>
+  </div>
+</div>
+
+<h2>Hermes egress: the only way out of the cluster</h2>
+<div class="panel">
+  <div class="egress">
+    <div class="box"><b>hermes pod</b>Agent, Haiku wrapper, swarm jobs. Default-deny NetworkPolicy.</div>
+    <div class="arr">→<br><span style="font-size:11px">Squid</span></div>
+    <div class="box"><b>egress-proxy (Squid)</b>
+      <div style="margin-top:6px"><span class="tag done">:3128 restricted</span> allowlist of hosts</div>
+      <div style="margin-top:6px"><span class="tag prog">:3129 open web</span> only for Haiku research</div>
+    </div>
+    <div class="arr">→</div>
+    <div class="box"><b>Destinations</b>
+      <ul>
+        <li>:3128 GitHub, Anthropic, Discord</li>
+        <li>:3129 WebSearch and WebFetch (research mode)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="legend" style="margin-top:10px">
+    <span>Squid listeners built and tested offline. Live checks in Docker and the cluster are still open (spec 15).</span>
+  </div>
+</div>
+
+<h2>Spec status</h2>
+<div class="specs">
+  <div class="spec done"><div class="n">02</div><div class="t">Ollama Inference</div><span class="tag done">DONE</span></div>
+  <div class="spec done"><div class="n">03</div><div class="t">OpenViking Context</div><span class="tag done">DONE</span></div>
+  <div class="spec prog"><div class="n">01</div><div class="t">Platform Foundation</div><span class="tag prog">IN PROGRESS</span><div class="sub" style="font-size:12px;margin-top:6px">restart test, idempotent rerun, bootstrap doc</div></div>
+  <div class="spec prog"><div class="n">12</div><div class="t">Claude Haiku via CLI</div><span class="tag prog">IN PROGRESS</span><div class="sub" style="font-size:12px;margin-top:6px">live and verified; console usage check and vision check open</div></div>
+  <div class="spec prog"><div class="n">13</div><div class="t">Swarm Orchestration</div><span class="tag prog">IN PROGRESS</span><div class="sub" style="font-size:12px;margin-top:6px">engine and offline tests done; live swarm-example run open</div></div>
+  <div class="spec prog"><div class="n">15</div><div class="t">Discord, Web Research</div><span class="tag prog">IN PROGRESS</span><div class="sub" style="font-size:12px;margin-top:6px">egress and research mode built; Discord side not started</div></div>
+  <div class="spec partial"><div class="n">04</div><div class="t">Hermes Agent</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">criteria to amend (browser MCP out of scope)</div></div>
+  <div class="spec partial"><div class="n">05</div><div class="t">Web UI Ingress</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">needs LAN and Windows browser checks</div></div>
+  <div class="spec partial"><div class="n">06</div><div class="t">Observability</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">mesh metrics, dashboard, alert fire tests</div></div>
+  <div class="spec partial"><div class="n">07</div><div class="t">Secrets and Backup</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">restore drills, datastore snapshot, prune</div></div>
+  <div class="spec partial"><div class="n">08</div><div class="t">Istio Service Mesh</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">mesh metrics; egress criterion to amend</div></div>
+  <div class="spec partial"><div class="n">09</div><div class="t">LiteLLM Gateway</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">MCP registration; restore check</div></div>
+  <div class="spec partial"><div class="n">10</div><div class="t">GitOps with Flux</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">CI secret scan stays off (pre-commit only)</div></div>
+  <div class="spec partial"><div class="n">11</div><div class="t">Nightly Specter</div><span class="tag partial">PARTIAL</span><div class="sub" style="font-size:12px;margin-top:6px">built and merged, inert: token, rehearsal, cron, go-live</div></div>
+  <div class="spec todo"><div class="n">14</div><div class="t">Autonomous Repo Work</div><span class="tag todo">TODO</span><div class="sub" style="font-size:12px;margin-top:6px">needs /new-spec, after spec 13 live run</div></div>
+</div>
+<div class="legend">
+  <span><i style="background:var(--done)"></i>DONE</span>
+  <span><i style="background:var(--prog)"></i>IN PROGRESS</span>
+  <span><i style="background:var(--partial)"></i>PARTIAL</span>
+  <span><i style="background:var(--todo)"></i>TODO</span>
+</div>
+
+<h2>GPU and memory budget</h2>
+<div class="two">
+  <div class="panel">
+    <b>VRAM, RTX 4080 (16 GiB)</b>
+    <div class="sub" style="font-size:12px">Measured 2026-11-16</div>
+    <div class="bar">
+      <div class="seg" style="left:0;width:40.2%;background:var(--done)">chat 6.43</div>
+      <div class="seg" style="left:40.2%;width:20.6%;background:var(--partial)">embed ~3.3</div>
+      <div class="seg" style="left:60.8%;width:39.2%;background:#2a3441;color:var(--muted);font-weight:400">free ~6.3 GiB (VLM swaps in here)</div>
+    </div>
+    <div class="scale"><span>0</span><span>8</span><span>16 GiB</span></div>
+  </div>
+  <div class="panel">
+    <b>WSL2 RAM (default allowance ~15 GB)</b>
+    <div class="sub" style="font-size:12px">Raise via <code>.wslconfig</code> if needed; figures from the spec index</div>
+    <div class="bar">
+      <div class="seg" style="left:0;width:1.7%;background:var(--accent)">mesh</div>
+      <div class="seg" style="left:1.7%;width:7.7%;background:var(--warn)">monitoring 1.15</div>
+      <div class="seg" style="left:9.4%;width:14%;background:#58a6ff;color:#0b0f14">OpenViking ≥2 GiB req.</div>
+    </div>
+    <div class="scale"><span>0</span><span>~15 GB</span></div>
+    <div class="sub" style="font-size:12px;margin-top:8px">Mesh ~250 MiB (budget 1.5 GB). Hermes, Open WebUI, LiteLLM and Postgres are small; check <code>kubectl top pods</code>.</div>
+  </div>
+</div>
+
+<h2>Open work (from the task list)</h2>
+<div class="two">
+  <div class="panel todo-col">
+    <h3>Now: local swarm and Haiku (specs 12, 13)</h3>
+    <ul>
+      <li><b>Close spec 12 (S):</b> one vision request via LiteLLM; Anthropic console usage check (needs you).</li>
+      <li><b>Build spec 13 (L):</b> live <code>swarm-example</code> run, cron registered paused.</li>
+      <li><b>Spec 14 (needs /new-spec):</b> repo-work job, opens PRs, never merges.</li>
+    </ul>
+    <h3>Spec 15: Discord and research</h3>
+    <ul>
+      <li><b>Squid check (S):</b> <code>squid -k parse</code> and allow/deny on :3128 and :3129, in Docker and the cluster.</li>
+      <li><b>Live research check (S):</b> <code>CLAUDE_HAIKU_WEB=1 claude-haiku.sh</code>.</li>
+      <li><b>Needs you:</b> create the Discord bot; token, user ID and channel ID through sops.</li>
+      <li><b>Build (L):</b> <code>hermes-discord</code> secret, gateway, <code>swarm-chat.sh</code>, digest cron.</li>
+    </ul>
+  </div>
+  <div class="panel todo-col">
+    <h3>Bookkeeping and real engineering (no user needed)</h3>
+    <ul>
+      <li><b>Spec files vs verified evidence (S):</b> tick criteria already verified in <code>deploy/*/README.md</code>; refresh the index.</li>
+      <li><b>Amend out-of-scope criteria (S):</b> specs 04, 08, 09, 10, 11.</li>
+      <li><b>Mesh metrics and Istio dashboard (M):</b> closes open items in specs 06 and 08.</li>
+      <li><b>Alert fire tests (S to M):</b> VRAM, crash loop, PVC fill.</li>
+      <li><b>Recovery for pods ztunnel did not enrol (S to M):</b> after <code>wsl --shutdown</code>.</li>
+    </ul>
+    <h3>Needs you at the machine</h3>
+    <ul>
+      <li><b>Spec 01:</b> rerun install scripts as a no-op (sudo); restart test.</li>
+      <li><b>Specs 05 and 06:</b> LAN and Windows browser reachability.</li>
+      <li><b>Spec 07 (destructive or root):</b> live and fresh-cluster restore, datastore snapshot, <code>wsl --export</code>.</li>
+      <li><b>Spec 11 go-live:</b> GitHub token, rehearsal, cron entry, first night's digest.</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  Generated from repo state on 2026-11-19. Status comes from <code>specs/00-index.md</code> (as of 2026-11-16) and <code>.specter/tasklist.md</code> (as of 2026-11-18); the two may differ slightly on spec 09. Not committed.
+</footer>
+
+</main>
+</body>
+</html>
