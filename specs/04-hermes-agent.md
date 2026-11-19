@@ -1,6 +1,6 @@
 # Spec 04 — Hermes Agent
 
-**Status:** PARTIAL (running headless and non-root; end-to-end task and OpenViking memory verified; browser MCP, LiteLLM MCP gateway and egress/NetworkPolicy pending; see deploy/hermes/README.md)
+**Status:** PARTIAL (running headless and non-root; end-to-end task and OpenViking memory verified; LiteLLM MCP gateway and egress/NetworkPolicy pending; see deploy/hermes/README.md)
 
 > **Egress, current state (specs 11, 12 and 15):** the pod has no direct internet route. Everything leaves through the Squid forward proxy in namespace `egress-proxy`. Port 3128 (the pod-wide default, `HTTPS_PROXY`) tunnels HTTPS only to the five GitHub hosts, `api.anthropic.com` and the Discord hosts. Port 3129 tunnels HTTPS to any public host and is used only by `claude-haiku.sh` in research mode (spec 15). The pod holds an optional `GITHUB_TOKEN`. There are no cluster credentials.
 
@@ -23,6 +23,7 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 - **Amendment (2026-11-16):** the Hermes context length is 65536, matching `OLLAMA_CONTEXT_LENGTH` (raised in spec 02). Hermes refuses any local model below 64K, so the chat model was `llama3.1:8b` (spec 02 amendment). The ConfigMap comments name that coupling, so a change to one is made to the other.
 - **Amendment (2026-11-16, later):** the chat model is `qwen3.5:9b` with `agent.reasoning_effort: medium` (thinking must stay on) and `agent.coding_context: off`. `llama3.1:8b` scored 21/40 on a replay of Hermes's real request because its Ollama template forces a tool call every turn; `qwen3.5:9b` scores 40/40 (`deploy/hermes/README.md`). The container also runs with `readOnlyRootFilesystem` and a `/tmp` emptyDir.
 - OpenViking (`http://openviking.openviking.svc`) is configured as the memory, knowledge and skills backend. It is wired through MCP via the LiteLLM MCP gateway (spec 09) if Hermes supports it, and through the closest supported integration (HTTP tool or skill) otherwise. The chosen path is documented in `deploy/hermes/README.md`.
+- **Note (direct OpenViking access):** Hermes reaches OpenViking directly over HTTP at `http://openviking.openviking.svc`, not through the LiteLLM MCP gateway. The reason is that the 9B model (`qwen3.5:9b`) has a tool-surface problem, so the gateway's tool surface is kept out of its path. The direct route is the one allowed in the egress rules below.
 
 **Storage**
 - `~/.hermes` lives on a PVC on the WSL ext4 volume (local-path StorageClass, not `/mnt/c`). It holds config, sessions and locally generated skills, and survives pod restarts and image upgrades.
@@ -52,7 +53,7 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
 - [ ] Deleting the pod preserves `~/.hermes` contents (sessions, skills) after the replacement starts.
 - [ ] `kubectl auth can-i --list` from inside the pod shows no cluster permissions, and no token exists at `/var/run/secrets/kubernetes.io`.
 - [ ] The container runs as a non-root user with no extra capabilities and no `hostPath` volumes, and resource limits are set.
-- [ ] From the pod, LiteLLM, OpenViking and an allowlisted web host are reachable. Ollama directly, an arbitrary non-allowlisted host and the Kubernetes API are not.
+- [ ] From the pod, LiteLLM, OpenViking and an allowlisted web host (reached through the Squid proxy's restricted listener on 3128) are reachable. Ollama directly, an arbitrary non-allowlisted host and the Kubernetes API are not.
 - [ ] An interactive session via `kubectl exec -it` responds using `chat` (`qwen3.5:9b`, thinking on) via LiteLLM.
 - [ ] Headless mode keeps running after the exec session disconnects, and `kubectl logs` shows activity.
 - [ ] End-to-end check: a prompt such as "create a file in the workspace listing the 3 largest files in it, then summarize" makes Hermes call a tool and produce the file in the bounded workspace.
