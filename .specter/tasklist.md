@@ -31,7 +31,6 @@ Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11
 
 The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
 
-- [ ] [swarm] **Spec 10:** in `specs/10-flux-gitops.md` reword the CI secret scan criterion to the pre-commit scan only (the `workflow` token scope is not added; the workflow file stays in the ci directory).
 - [ ] **Spec 11 and `deploy/hermes/README.md` (step 1 of the GitHub token section):** the token is now fine-grained for all repositories (Contents and Pull requests read/write, Metadata read; no Administration, no Workflows; expires 2027-02-14), not a single repository. Update the wording, and the spec 10 amendment that says the hermes namespace holds a single-repo token.
 
 ## 3. Real work I can do without you

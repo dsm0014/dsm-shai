@@ -62,7 +62,7 @@ Make the git repo the single source of truth for cluster state by running Flux o
 - [ ] Flux is installed from pinned versions with only source, kustomize and helm controllers, and the measured controller memory is recorded and within budget.
 - [ ] `scripts/bootstrap-flux.sh` takes a fresh k3s cluster to a fully reconciled stack, and re-running it makes no changes.
 - [ ] Flux syncs from the public GitHub repo with no credential stored in the cluster, and no token, deploy key or age private key is committed.
-- [ ] The pre-commit and CI secret scanning fails on an injected plaintext Secret and on an unencrypted `*.sops.yaml`, and passes on the clean repo, including a scan of the full git history.
+- [ ] The pre-commit secret scanning fails on an injected plaintext Secret and on an unencrypted `*.sops.yaml`, and passes on the clean repo, including a scan of the full git history.
 - [ ] Reconciliation order follows the `dependsOn` chain above, verified by `flux get kustomizations` and `flux get helmreleases` showing each stage ready before the next starts.
 - [ ] Deliberately breaking an upstream stage (for example a bad Istio value) blocks downstream stages and surfaces a clear error.
 - [ ] An encrypted Secret committed to the repo is decrypted and applied by kustomize-controller, and no plaintext secret exists in git, in the working tree, or in Flux's source artifact.
