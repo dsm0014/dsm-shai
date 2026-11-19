@@ -2,7 +2,7 @@
 
 > **Reconciled with spec 12 (2026-11-18):** `haiku` is not a LiteLLM alias. Every Haiku call is `/opt/jobs/claude-haiku/claude-haiku.sh` (Claude Code CLI, owner's subscription): text in, text out, no tools, no token or USD metering. Caps are call counts and the audit records calls and bytes, not tokens. Local `chat` goes through LiteLLM with the `hermes` key.
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 ## Purpose
 
@@ -46,16 +46,16 @@ Let Hermes finish tasks on its own by splitting them across a swarm of workers: 
 
 ## Acceptance Criteria
 
-- [ ] `swarm.py --dry-run` on the example prints a schema-valid plan and makes no LiteLLM call (Haiku call counter and LiteLLM spend unchanged).
-- [ ] The scheduler never has more than 2 `chat` requests in flight and never more than `SWARM_HAIKU_PARALLEL` Haiku wrapper calls (asserted by a test with a fake gateway); no 429 is produced in a full example run.
-- [ ] `route.py` tests: a `hard` step goes to `haiku`; a normal step goes to `chat`; after two local verifier failures it goes to `haiku`; the model output cannot change the tier.
-- [ ] A forced verifier failure ends the task `failed`, discards uncommitted work, writes an audit entry and a digest line, and sets `swarm_last_run_status` to failure.
-- [ ] Reaching `max_haiku_calls`, `max_steps` or the timeout ends the task `capped` with no further calls; the wrapper's daily cap rejects Haiku calls once spent while `chat` keeps working.
-- [ ] A second launch of the same task logs `skipped: locked`; `hermes pause`, the swarm disabled flag and the wrapper's `disabled` flag each stop a run (the flags are tested locally).
+- [x] `swarm.py --dry-run` on the example prints a schema-valid plan and makes no LiteLLM call (Haiku call counter and LiteLLM spend unchanged). Verified offline 2026-11-19 (`make swarm-test`, 77 tests).
+- [x] The scheduler never has more than 2 `chat` requests in flight and never more than `SWARM_HAIKU_PARALLEL` Haiku wrapper calls (asserted by a test with a fake gateway); no 429 is produced in a full example run. Verified offline 2026-11-19 (`make swarm-test`, 77 tests). The live no-429 check is part of the live run.
+- [x] `route.py` tests: a `hard` step goes to `haiku`; a normal step goes to `chat`; after two local verifier failures it goes to `haiku`; the model output cannot change the tier. Verified offline 2026-11-19 (`make swarm-test`, 77 tests).
+- [x] A forced verifier failure ends the task `failed`, discards uncommitted work, writes an audit entry and a digest line, and sets `swarm_last_run_status` to failure. Verified offline 2026-11-19 (`make swarm-test`, 77 tests).
+- [x] Reaching `max_haiku_calls`, `max_steps` or the timeout ends the task `capped` with no further calls; the wrapper's daily cap rejects Haiku calls once spent while `chat` keeps working. Verified offline 2026-11-19 (`make swarm-test`, 77 tests). Real wrapper cap rejection is simulated with the fake wrapper's exit 5.
+- [x] A second launch of the same task logs `skipped: locked`; `hermes pause`, the swarm disabled flag and the wrapper's `disabled` flag each stop a run (the flags are tested locally). Verified offline 2026-11-19 (`make swarm-test`, 77 tests). `hermes pause` is the `ESTOP` file, tested locally.
 - [ ] With `SWARM_ORCHESTRATOR=chat` and Anthropic blocked, the example completes with local workers only and the audit entry records `haiku_calls: 0`.
 - [ ] A live run of `swarm-example` completes: local steps run, one Haiku merge step runs, the report is stored in OpenViking, the audit entry has per-model call counts matching `claude-haiku/audit.jsonl` and the LiteLLM request log, and nothing is written outside `/opt/data/swarm/`.
 - [ ] The cron entry registers paused via `register-cron.sh`; `hermes cron resume <id>` runs it at the next schedule time; `hermes cron incidents` shows a failure when forced.
 - [ ] `make swarm-test` passes offline; `make swarm-plan`, `swarm-run`, `swarm-status` and `swarm-stop` work on `swarm-example` from the repo root; a missing `TASK` exits 2 with usage; `make help` lists every swarm target.
-- [ ] A task naming a repo outside `SWARM_ALLOWED_REPOS` (or with the variable unset) is refused before any call.
-- [ ] `git grep -E 'sk-ant-|ghp_|github_pat_' -- . ':!*.md'` is clean; no key appears in a ConfigMap, log or audit file.
-- [ ] `deploy/hermes/README.md` documents the roles, caps, routing rules, template fields, kill switches and how to create a new job from the template; spec 04 carries a pointer to this spec.
+- [x] A task naming a repo outside `SWARM_ALLOWED_REPOS` (or with the variable unset) is refused before any call. Verified offline 2026-11-19 (`make swarm-test`, 77 tests).
+- [x] `git grep -E 'sk-ant-|ghp_|github_pat_' -- . ':!*.md'` is clean; no key appears in a ConfigMap, log or audit file. Verified offline 2026-11-19 (`make swarm-test`, 77 tests). No new hits.
+- [x] `deploy/hermes/README.md` documents the roles, caps, routing rules, template fields, kill switches and how to create a new job from the template; spec 04 carries a pointer to this spec. Verified 2026-11-19.

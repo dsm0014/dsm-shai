@@ -1,0 +1,25 @@
+# Alerts for the Hermes swarm (spec 13). Metrics come from the same exporter on port 9101 as the nightly job (ServiceMonitor
+# hermes-nightly in nightly-alerts.yaml scrapes it). The digest line in /opt/data/swarm/digest.log is the primary alert.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: swarm
+  namespace: monitoring
+spec:
+  groups:
+    - name: swarm
+      rules:
+        - alert: SwarmLastRunFailed
+          expr: swarm_last_run_status == 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Last swarm run failed or was capped"
+            description: "Check /opt/data/swarm/digest.log and audit.jsonl in the hermes pod (make swarm-status)."
+        - alert: SwarmStale
+          # Only once a run has succeeded; a swarm that never ran writes 0 and is covered by SwarmLastRunFailed.
+          expr: (time() - swarm_last_success_timestamp > 3 * 86400) and swarm_last_success_timestamp > 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "Swarm has not succeeded for 3 days"

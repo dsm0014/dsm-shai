@@ -6,6 +6,8 @@ SHELL       := /bin/bash
 
 NIGHTLY := /opt/jobs/nightly-specter/run.sh
 STATE   := /opt/data/nightly-specter
+SWARM   := /opt/jobs/swarm/run.sh
+SWSTATE := /opt/data/swarm
 # Run a command in the Hermes container. The pod prints a harmless "install out of sync" line; hide it.
 HERMES  = kubectl -n hermes exec deploy/hermes -c hermes --
 QUIET   = 2>&1 | grep -v 'install out of sync' || true
@@ -13,9 +15,12 @@ QUIET   = 2>&1 | grep -v 'install out of sync' || true
 # A task is passed to the pod through the environment, so quotes and $ in it cannot break the command line.
 export TASK
 export REASON
+export CONFIRM
+export SWARM_ORCHESTRATOR
+export SWARM_HAIKU_PARALLEL
 
 .PHONY: help start stop status verify hermes-task hermes-pause hermes-resume \
-        claude-haiku-preflight nightly-preflight nightly-dry-run nightly-run nightly-status test
+        claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## /\1\t/' | awk -F'\t' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -73,9 +78,36 @@ nightly-run: ## Real run: opens and may MERGE pull requests in the target repo (
 nightly-status: ## Is it running, last audit entries, digest, metrics
 	@$(HERMES) sh -c 'pgrep -f "[o]rchestrate.py" >/dev/null && echo "RUNNING" || echo "not running"; echo "--- audit (last 3)"; tail -3 $(STATE)/audit.jsonl | cut -c1-400; echo "--- digest"; tail -5 $(STATE)/digest.log; echo "--- metrics"; cat $(STATE)/metrics.prom 2>/dev/null | grep -v "^#" || true' $(QUIET)
 
+# ---- swarm (spec 13) ---------------------------------------------------------------------------------------------
+# TASK is a name under deploy/hermes/jobs/ (default swarm-example; resolves to /opt/jobs/<name>/task.yaml in the pod) or a path to a task YAML.
+swarm-preflight: ## Spec 13: tools, state dir, Haiku wrapper, chat reachability, Haiku daily cap
+	@$(HERMES) bash $(SWARM) --preflight $(QUIET)
+
+swarm-plan: ## Spec 13 dry run: print the plan for TASK (default swarm-example); no worker call, spends nothing
+	@t="$${TASK:-swarm-example}"; \
+	 if [ -f "deploy/hermes/jobs/$$t/task.yaml" ]; then f="/opt/jobs/$$t/task.yaml"; \
+	 else echo "usage: make swarm-plan TASK=<name under deploy/hermes/jobs/>"; exit 2; fi; \
+	 $(HERMES) env "SWARM_ORCHESTRATOR=$$SWARM_ORCHESTRATOR" bash $(SWARM) "$$f" --dry-run $(QUIET)
+
+swarm-run: ## Spec 13: run TASK (default swarm-example) in the pod in the background, log under /opt/data/swarm
+	@t="$${TASK:-swarm-example}"; \
+	 if [ -f "deploy/hermes/jobs/$$t/task.yaml" ]; then f="/opt/jobs/$$t/task.yaml"; \
+	 else echo "usage: make swarm-run TASK=<name under deploy/hermes/jobs/>"; exit 2; fi; \
+	 $(HERMES) env "SWARM_ORCHESTRATOR=$$SWARM_ORCHESTRATOR" "SWARM_HAIKU_PARALLEL=$$SWARM_HAIKU_PARALLEL" "F=$$f" "N=$$t" sh -c 'mkdir -p $(SWSTATE) && ( nohup bash $(SWARM) "$$F" > "$(SWSTATE)/$$N.log" 2>&1 & ); sleep 2; echo "started; log: $(SWSTATE)/$$N.log"' $(QUIET)
+
+swarm-status: ## Spec 13: running or not, last audit entries, digest, metrics, Haiku calls used today
+	@$(HERMES) sh -c 'pgrep -f "[s]warm.py" >/dev/null && echo "RUNNING" || echo "not running"; echo "--- audit (last 3)"; tail -3 $(SWSTATE)/audit.jsonl 2>/dev/null | cut -c1-400; echo "--- digest"; tail -5 $(SWSTATE)/digest.log 2>/dev/null; echo "--- metrics"; grep -hv "^#" $(SWSTATE)/metrics.prom 2>/dev/null; echo "--- haiku calls today: $$(cat /opt/data/claude-haiku/calls-$$(date +%F) 2>/dev/null || echo 0) of $${CLAUDE_HAIKU_DAILY_CALLS:-200}"' $(QUIET)
+
+swarm-stop: ## Spec 13: stop the running swarm (SIGTERM; the task lock is released on exit); hermes-pause is the emergency stop
+	@$(HERMES) sh -c 'pkill -TERM -f "[s]warm.py" && echo "stop signal sent" || echo "no swarm running"' $(QUIET)
+
+swarm-test: ## Spec 13: offline swarm tests (fake gateway and wrapper, no cluster needed)
+	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
+
 claude-haiku-preflight: ## Spec 12: is the Claude CLI and subscription token present in the pod (no call made)
 	@$(HERMES) bash /opt/jobs/claude-haiku/claude-haiku.sh --preflight $(QUIET)
 
-test: ## Run the offline tests (nightly job, Claude Haiku wrapper) (no cluster needed)
+test: ## Run the offline tests (nightly job, swarm, Claude Haiku wrapper) (no cluster needed)
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh
+	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
 	python3 -I -m unittest discover -s deploy/hermes/jobs/claude-haiku/tests -p 'test_*.py' -v
