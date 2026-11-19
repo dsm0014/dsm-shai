@@ -3,7 +3,7 @@
 Token comes from GITHUB_TOKEN; the repo is NIGHTLY_REPO (owner/name); the API base is NIGHTLY_API_BASE (tests point it
 at a local stub). Egress to api.github.com goes through the proxy via HTTPS_PROXY (urllib honours it).
 """
-import json, os, urllib.parse, urllib.request
+import re, json, os, urllib.parse, urllib.request
 
 BASE = os.environ.get("NIGHTLY_API_BASE", "https://api.github.com")
 
@@ -27,7 +27,13 @@ def _req(method, path, body=None):
 
 
 def repo():
-    return os.environ["NIGHTLY_REPO"]
+    """The target repo, only if it is on the allowlist (spec 11). The GitHub token covers all repositories, so this and run.sh
+    are the only limit on where the job can write. Anything else, or an unset allowlist, fails closed."""
+    r = os.environ.get("NIGHTLY_REPO", "")
+    allowed = [a.strip() for a in os.environ.get("NIGHTLY_ALLOWED_REPOS", "").split(",") if a.strip()]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", r) or r not in allowed:
+        raise ApiError("NIGHTLY_REPO %r is not in NIGHTLY_ALLOWED_REPOS" % r)
+    return r
 
 
 def prs(state):

@@ -22,6 +22,13 @@ class RunFlows(unittest.TestCase):
         self.assertEqual(r.returncode, 0); self.assertIn("not configured", r.stdout)
         self.assertEqual(self.last()["status"], "not_configured"); self.assertEqual(e.requests("POST"), [])
 
+    def test_isolation_guard_refuses_other_repo(self):
+        for kw in ({"NIGHTLY_REPO": "acme/other"}, {"NIGHTLY_ALLOWED_REPOS": ""}, {"NIGHTLY_REPO": "acme/target/../x"}):
+            e = self.mkenv(); r = e.run(**kw)
+            self.assertEqual(r.returncode, 2, kw); self.assertIn("refused", r.stderr)
+            self.assertEqual(self.last()["status"], "refused"); self.assertEqual(e.requests("POST"), [])
+            self.assertEqual(e.requests("GET"), []); e.close(); self.e = None
+
     def test_lock_held_skips(self):
         e = self.mkenv(); os.makedirs(e.state, exist_ok=True)
         holder = subprocess.Popen(["flock", os.path.join(e.state, "lock"), "sleep", "6"]); import time; time.sleep(1)

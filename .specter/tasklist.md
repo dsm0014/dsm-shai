@@ -10,7 +10,6 @@ Goal: Hermes works on the repo autonomously. Spec 12 (Haiku wrapper) is live; sp
 
 - [ ] **Close spec 12 (S):** remaining: one `vision` request through LiteLLM (needs the Open WebUI key), and the Anthropic console API-usage check (needs you). Then set spec 12 DONE in the index.
 - [ ] **Build spec 13 with `/do-spec` (L):** `route.py`, `swarm.py` (2 local, 2 Haiku), verifiers, state and audit, `swarm-*` Make targets, `swarm-template` and `swarm-example`, offline tests with a fake gateway. Then a live `swarm-example` run and the cron entry registered paused.
-- [ ] **Spec 11 isolation guard (S, also in section 5):** do it first. The swarm reuses the same fail-closed repo rule (`SWARM_ALLOWED_REPOS`), because the GitHub token now covers all repos.
 - [ ] **Spec 14, autonomous repo work (needs `/new-spec`):** a swarm job that takes a task from this tasklist, works in a branch, opens a PR for you to merge, and never merges itself. Write it only after the spec 13 live run passes.
 
 ## 1. Bookkeeping: make the spec files match what is already verified (S, one PR)
@@ -44,7 +43,6 @@ The decisions are made; the criteria still demand the work, so these specs canno
 
 ## 5. Spec 11: nightly specter improvement (built, merged, inert)
 
-- [ ] **Isolation guard (S):** the token no longer limits the job to `claude-specter-auto`, so `NIGHTLY_REPO` is the only thing that does. Check that the job refuses any other target, and that a wrong `NIGHTLY_REPO` fails closed.
 - [~] **Rehearse on the rehearsal repo** (`dsm0014/claude-specter-auto`): the first dry run passed (Mode A, 3 specs, nothing pushed). Still to do: a second dry run to confirm the two bug fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
 - [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.

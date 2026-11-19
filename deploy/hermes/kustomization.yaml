@@ -37,6 +37,8 @@ configMapGenerator:
   - name: nightly-specter-env
     literals:
       - NIGHTLY_REPO=dsm0014/claude-specter-auto
+      # Isolation guard: the job refuses any NIGHTLY_REPO not listed here. Go-live adds dsm0014/claude-specter in the same PR.
+      - NIGHTLY_ALLOWED_REPOS=dsm0014/claude-specter-auto
       - NIGHTLY_TOKEN_TYPE=fine-grained
       - IMPL_PROBATION_NIGHTS=1
       - NIGHTLY_MAX_LINES=400
