@@ -132,7 +132,10 @@ def main(task, run, swarm, lockf, state_name):
         items = []
         for f in info["files"]:
             p = os.path.join(workdir, f)
-            items.append({"id": f, "text": open(p, errors="replace").read()[:12000] if os.path.exists(p) else "(new file)"})
+            text = open(p, errors="replace").read() if os.path.exists(p) else "(new file)"
+            if len(text) > envint("SWARM_MAX_FILE_CHARS", 24000):  # a worker that cannot see the whole file would rewrite it from a part
+                raise Refused("refused: %s is larger than the worker can see whole (SWARM_MAX_FILE_CHARS)" % f)
+            items.append({"id": f, "text": text})
         # plan with the orchestrator, then run the steps under the swarm's caps
         run.task["goal"] = "Complete this repository task by editing the listed files, one step per file: " + info["text"]
         run.task["verifiers"] = ["file_block"]
@@ -171,6 +174,10 @@ def main(task, run, swarm, lockf, state_name):
         for f in changed:
             if f not in allowed or forbidden(f) and f != TASKLIST:
                 raise swarm.Failed("change outside allowed paths: %s" % f)
+        for l in git("diff", "--numstat", cwd=workdir).splitlines():  # a rewrite that throws most of a file away is a bad edit
+            a, d, f = l.split("\t")[:3]
+            if f != TASKLIST and d.isdigit() and int(d) > max(10, len(git("show", "HEAD:" + f, cwd=workdir).splitlines()) * envint("SWARM_MAX_DELETE_PCT", 50) // 100):
+                raise swarm.Failed("change deletes too much of %s (%s lines)" % (f, d))
         lines_changed = sum(int(a) + int(d) for a, d, *_ in (l.split("\t") for l in git("diff", "--numstat", cwd=workdir).splitlines()) if a.isdigit() and d.isdigit())
         if len(changed) > envint("SWARM_MAX_FILES", 6) + 1 or lines_changed > envint("SWARM_MAX_LINES", 300):
             raise swarm.Failed("change over the file or line cap (%d files, %d lines)" % (len(changed), lines_changed))
