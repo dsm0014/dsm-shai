@@ -31,7 +31,6 @@ Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11
 
 The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
 
-- [ ] **`deploy/hermes/README.md` (step 1 of the GitHub token section):** same wording fix (all repositories, not a single repository). The file is too large for a swarm worker to see whole, so do this one by hand.
 
 ## 3. Real work I can do without you
 
