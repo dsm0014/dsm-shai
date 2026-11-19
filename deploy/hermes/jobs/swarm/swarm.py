@@ -202,7 +202,7 @@ class Run:
         return "\n\n".join(parts)[:CTX_CHARS]
 
     def run_step(self, step, items):
-        stat = {"id": step["id"], "tag": step["tag"], "attempts": 0, "tiers": [], "verifier": "", "ok": False}
+        stat = {"id": step["id"], "tag": step["tag"], "attempts": 0, "tiers": [], "verifier": "", "fails": [], "ok": False}
         local_failures, prev = 0, None
         names = list(self.task.get("verifiers") or []) + (["cites_inputs"] if step.get("inputs") else [])
         ctx = {"input_ids": (step.get("inputs") or []), "min_chars": self.task.get("min_chars", 40),
@@ -221,11 +221,14 @@ class Run:
                 text = self.call(tier, prompt)
             except workers.WorkerError as e:
                 stat["verifier"] = str(e)[:80]
+                stat["fails"].append(stat["verifier"])
                 if tier == "chat":
                     local_failures += 1
                 continue
             ok, why = verifiers.run(names, text, ctx)
             stat["verifier"] = why or "ok"
+            if not ok:
+                stat["fails"].append(why[:80])  # the reason only, never the model's text
             if ok:
                 os.makedirs(os.path.join(self.dir, "steps"), exist_ok=True)
                 tmp = os.path.join(self.dir, "steps", step["id"] + ".out.tmp")
