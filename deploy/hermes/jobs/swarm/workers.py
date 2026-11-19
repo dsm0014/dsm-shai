@@ -27,7 +27,8 @@ def untrusted(label, text):
 def call_chat(prompt, timeout=180):
     """Return (text, usage_dict). Never retried here; the scheduler owns retries."""
     key = os.environ.get("LITELLM_HERMES_KEY", "")
-    body = json.dumps({"model": "chat", "messages": [{"role": "user", "content": prompt}], "max_tokens": 4000}).encode()
+    max_tokens = int(os.environ.get("SWARM_CHAT_MAX_TOKENS", "8000"))  # thinking is on: a small cap can leave the reply empty
+    body = json.dumps({"model": "chat", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}).encode()
     req = urllib.request.Request(LITELLM + "/chat/completions", data=body,
                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
     try:

@@ -194,6 +194,8 @@ Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps
 
 **Fail closed:** a task's `repo` must be in `SWARM_ALLOWED_REPOS` (ConfigMap `swarm-env`, currently `dsm0014/dsm-shai`); anything else, or an empty list, is refused with exit 2 before any call. Fetched content is wrapped in `UNTRUSTED_CONTENT` markers.
 
+**Local chat budget:** `SWARM_CHAT_MAX_TOKENS` (default 8000) caps each local call's output; the model thinks first, so a small cap can leave the reply empty.
+
 **Kill switches:** `make hermes-pause` (the `ESTOP` file), `touch /opt/data/swarm/disabled`, `touch /opt/data/claude-haiku/disabled` (stops every Haiku call; the run ends `capped`), `make swarm-stop`.
 
 **Task file** (restricted YAML: `key: value`, block lists, one nested map, JSON values):

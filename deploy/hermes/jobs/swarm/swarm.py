@@ -184,7 +184,7 @@ class Run:
             p = prompt_text("plan", goal=self.task["goal"], items=listing, max_steps=min(self.max_steps, MAX_PLAN_STEPS),
                             problems=("Your previous plan was invalid: " + "; ".join(problems)) if problems else "")
             plan = json_in(self.call(tier, p))
-            problems = ["not JSON"] if plan is None else validate_plan(plan, items, self.max_steps)
+            problems = ["the reply was not a single JSON object; reply with only the JSON object and no other text"] if plan is None else validate_plan(plan, items, self.max_steps)
             if not problems:
                 if len(plan["steps"]) > self.max_steps:
                     raise Capped("max_steps")

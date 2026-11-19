@@ -4,13 +4,15 @@
 
 Specs 01, 04 to 08 and 10 to 13 are not DONE. Most of the gap is bookkeeping (section 1), a few decided-out-of-scope criteria (section 2) and checks that need you at the machine (section 4). Real engineering is sections 3 and 5.
 
-## 0. Priority: Haiku + Qwen swarms (specs 12 and 13)
+## 0. Priority: Haiku + Qwen swarms (specs 12, 13, 14)
 
-Goal: Hermes works on the repo autonomously. Spec 12 (Haiku wrapper) is live; spec 13 (swarm) is reconciled with it and not built. Do these in order.
+Spec 12 is live, spec 13 is built, deployed and live-verified (example run, forced failure, kill switch, metrics). Remaining:
 
-- [ ] **Close spec 12 (S):** remaining: one `vision` request through LiteLLM (needs the Open WebUI key), and the Anthropic console API-usage check (needs you). Then set spec 12 DONE in the index.
-- [ ] **Build spec 13 with `/do-spec` (L):** `route.py`, `swarm.py` (2 local, 2 Haiku), verifiers, state and audit, `swarm-*` Make targets, `swarm-template` and `swarm-example`, offline tests with a fake gateway. Then a live `swarm-example` run and the cron entry registered paused.
-- [ ] **Spec 14, autonomous repo work (needs `/new-spec`):** a swarm job that takes a task from this tasklist, works in a branch, opens a PR for you to merge, and never merges itself. Write it only after the spec 13 live run passes.
+- [ ] **Roll out the planner fix (S):** Flux is stuck on the `prometheus-community` HelmRepository index download (timeout), which blocks every stage after `monitoring`. Fix or retry that fetch, then confirm Flux applies the latest `main` to `hermes`. Until then the live pod runs the older engine.
+- [ ] **Finish the spec 13 live checks (S):** a local-only run (`SWARM_ORCHESTRATOR=chat`) with the Haiku wrapper disabled, `hermes pause` stopping a run, `hermes cron resume` firing at a schedule time and `hermes cron incidents` after a forced failure. Then set spec 13 DONE in the index.
+- [ ] **Close spec 12 (S):** one `vision` request through LiteLLM (needs the Open WebUI key) and the Anthropic console API-usage check (needs you). Then set spec 12 DONE.
+- [ ] **Build spec 14 with `/do-spec` (L):** `pick-task.py`, the repo-work job, guards, offline tests, then the rehearsal-repo live check. Queue tasks by adding `[swarm]` to a task line.
+- [ ] **Nightly `register-cron.sh` (S):** Hermes accepts only a filename under `/opt/data/scripts` for `--script`; the nightly job's script still passes an absolute path (see the swarm script for the fix).
 
 ## 0b. Spec 15: Discord, swarm commands, Haiku web research
 
