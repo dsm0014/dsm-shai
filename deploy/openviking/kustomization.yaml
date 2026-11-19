@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: openviking
 resources:
   - openviking.yaml
+  - egress-networkpolicy.yaml
 configMapGenerator:
   - name: openviking-config
     files:

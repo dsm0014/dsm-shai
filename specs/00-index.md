@@ -15,7 +15,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 09 | [LiteLLM Gateway](./09-litellm-gateway.md) | PARTIAL | MCP and browser registration; consumer integrations (done for OpenViking, Hermes and Open WebUI); Istio deny (done); fail-fast on Ollama outage (bounded by a 180 s timeout) |
 | 10 | [GitOps with Flux](./10-flux-gitops.md) | PARTIAL | CI secret scan stays inactive (the `workflow` token scope is not added; the pre-commit scan is active); everything else per `.specter/archive/tasklist-specs-01-10-2026-11-16.md` step 2 |
 | 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | PARTIAL | Built, merged and running inert (proxy and preflight verified in the cluster). Open: GitHub token, `hermes pause` test, fork rehearsal, cron entry, go-live |
-| 12 | [Claude Haiku via Claude Code CLI](./12-anthropic-litellm-key.md) | IN PROGRESS | Live: image, token, wrapper call and proxy path verified 2026-11-18. Open: offline wrapper tests, fail-with-API-key preflight, direct egress from other namespaces (no default-deny), no-content log check. Subscription only, no API key |
+| 12 | [Claude Haiku via Claude Code CLI](./12-anthropic-litellm-key.md) | IN PROGRESS | Live: image, token, wrapper call and proxy path verified 2026-11-18. Egress gap closed with litellm and openviking egress policies; wrapper offline tests pass. Open: the Anthropic console API-usage check, LiteLLM vision regression check, and egress policies for ollama, monitoring and istio-system. Subscription only, no API key |
 | 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | TODO | Not started |
 
 ## Measured footprint (2026-11-16)

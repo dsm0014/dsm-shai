@@ -4,6 +4,7 @@ namespace: litellm
 resources:
   - postgres.yaml
   - litellm.yaml
+  - egress-networkpolicy.yaml
 configMapGenerator:
   - name: litellm-config
     files:

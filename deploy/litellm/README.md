@@ -71,3 +71,7 @@ Registered on 2026-11-16: the OpenViking MCP server, via `POST /v1/mcp/server` (
 - **Per-server route:** `POST /openviking/mcp` on port 4000. The aggregate `/mcp/` route returned no tools for the master key.
 
 Hermes does **not** use this route yet. Routed through the gateway, the OpenViking tools were deferred behind a bridge, and llama3.1:8b did not call them reliably (recall failed). Hermes uses the direct OpenViking route, which passed recall. Revisit when the model can call deferred tools reliably.
+
+## Egress policy (spec 12 follow-up)
+
+`egress-networkpolicy.yaml` limits LiteLLM to DNS, Ollama (11434), its Postgres (5432) and the ambient HBONE tunnel (15008). Postgres may reach DNS and HBONE only. LiteLLM has no route to the public internet, so no cloud provider can be configured in it by accident. To test it, make a real HTTPS request from the pod; a plain TCP connect always succeeds in ambient mode (the redirect to ztunnel accepts it), so it proves nothing.
