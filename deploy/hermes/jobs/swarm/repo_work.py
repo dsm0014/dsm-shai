@@ -157,6 +157,10 @@ def main(task, run, swarm, lockf, state_name):
             body = extract_block(run.outputs[s["id"]])
             if body is None or not body.strip():
                 raise swarm.Failed("step %s returned no file block" % s["id"])
+            orig = next(i["text"] for i in items if i["id"] == f)
+            keep = envint("SWARM_MIN_KEEP_PCT", 70)
+            if orig != "(new file)" and len(body) * 100 < len(orig) * keep:  # a 9B worker can return a cut-down file that passes every other check
+                raise swarm.Failed("output shrank %s to %d%% of its size (minimum %d%%)" % (f, len(body) * 100 // max(1, len(orig)), keep))
             os.makedirs(os.path.dirname(os.path.join(workdir, f)) or workdir, exist_ok=True)
             open(os.path.join(workdir, f), "w").write(body)
         # tick the task off: remove its line, as the task-list convention says

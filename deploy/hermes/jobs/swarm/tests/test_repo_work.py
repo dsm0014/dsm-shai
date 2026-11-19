@@ -487,6 +487,34 @@ class FileSizeAndDeletionGuards(RepoWorkCase):
         rc, out, err = self.run_repo("--run-id", "run-shrink", SWARM_CLONE_URL=self._big_remote(60))
         self.assertEqual(rc, 1, out + err)
         self.assertEqual(self.last()["status"], "failed")
-        self.assertIn("deletes too much", self.last()["reason"])
+        self.assertTrue("shrank" in self.last()["reason"] or "deletes too much" in self.last()["reason"], self.last()["reason"])
         self.assertEqual(self.branches(), [])
         self.assertEqual(self.posts(), [])
+
+
+class ShrinkGuard(RepoWorkCase):
+    """Second live run (2026-11-19): a 70 line document came back as 3 lines and passed the deletion guard. The new file must keep
+    at least SWARM_MIN_KEEP_PCT (70) percent of the old file's size."""
+
+    def _remote(self, lines):
+        files = seed_files()
+        files["docs/a.md"] = "\n".join("line %d of the document, with some text in it" % i for i in range(lines)) + "\n"
+        return make_remote(self.root, "mid", files)
+
+    def _run_with(self, worker_lines, **over):
+        # the same line text as the seed file, so only the dropped lines count as deletions
+        out = lambda prompt: fence("\n".join("line %d of the document, with some text in it" % i for i in range(worker_lines)) + "\nmentions docs/a.md")
+        self.env.gateway.reply = reply_for(["docs/a.md"], worker=out)
+        return self.run_repo("--run-id", "run-ratio", SWARM_CLONE_URL=self._remote(70), **over)
+
+    def test_cut_down_file_is_rejected(self):
+        rc, out, err = self._run_with(3)
+        self.assertEqual(rc, 1, out + err)
+        self.assertIn("shrank", self.last()["reason"])
+        self.assertEqual(self.branches(), [])
+        self.assertEqual(self.posts(), [])
+
+    def test_a_file_that_keeps_most_of_its_size_is_accepted(self):
+        rc, out, err = self._run_with(66)
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(self.last()["status"], "ok", self.last())
