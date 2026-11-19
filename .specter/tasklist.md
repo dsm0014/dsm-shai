@@ -12,6 +12,16 @@ Goal: Hermes works on the repo autonomously. Spec 12 (Haiku wrapper) is live; sp
 - [ ] **Build spec 13 with `/do-spec` (L):** `route.py`, `swarm.py` (2 local, 2 Haiku), verifiers, state and audit, `swarm-*` Make targets, `swarm-template` and `swarm-example`, offline tests with a fake gateway. Then a live `swarm-example` run and the cron entry registered paused.
 - [ ] **Spec 14, autonomous repo work (needs `/new-spec`):** a swarm job that takes a task from this tasklist, works in a branch, opens a PR for you to merge, and never merges itself. Write it only after the spec 13 live run passes.
 
+## 0b. Spec 15: Discord, swarm commands, Haiku web research
+
+Egress (two Squid listeners) and the wrapper's research mode are written and tested offline. Do these in order.
+
+- [ ] **Verify the Squid config (S):** `squid -k parse`, then the allow and deny checks for `:3128` and `:3129` in Docker (uid 13, read-only root); after Flux applies it, the in-cluster checks in `deploy/istio/egress/README.md` for both ports. Docker did not respond on 2026-11-18.
+- [ ] **Live research check (S):** `CLAUDE_HAIKU_WEB=1 claude-haiku.sh` in the pod; confirm `WebSearch` works on the subscription token, the tool list is exactly the two tools, and the Squid log shows `:3129`.
+- [ ] **Needs you (S):** create the Discord application and bot (Message Content Intent on, Server Members Intent off), invite it to a private server, give me the token, your user ID and the channel ID through `sops`; I never see them in plaintext in the repo.
+- [ ] **`quick_commands` test (S):** on a throwaway command, find out whether the LLM is bypassed, how arguments and stdout and the exit code behave, the timeout and working directory, and whether a non-admin is blocked.
+- [ ] **Build with `/do-spec` (L):** the `hermes-discord` secret, gateway config (`discord_admin` off, allowlists), `swarm-chat.sh` with offline tests, the digest cron script copied into `HERMES_HOME/scripts`, README, then the live criteria.
+
 ## 1. Bookkeeping: make the spec files match what is already verified (S, one PR)
 
 Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11 have 7 and 4 open, although most of those criteria were verified (evidence is in each `deploy/*/README.md`).
@@ -22,7 +32,7 @@ Specs 01, 04, 05, 06, 07, 08 and 10 have no acceptance box ticked, and 09 and 11
 
 The decisions are made; the criteria still demand the work, so these specs cannot reach DONE as written.
 
-- [ ] **Spec 04:** drop the browser MCP tools; reword "an allowlisted web host is reachable" to the five GitHub hosts through the Squid proxy (spec 11); record that Hermes reaches OpenViking directly, not through the LiteLLM MCP gateway (tool-surface problem with the 9B model).
+- [ ] **Spec 04:** drop the browser MCP tools; reword "an allowlisted web host is reachable" to the Squid proxy's restricted listener (done for the egress prose; the acceptance box is not reworded yet); record that Hermes reaches OpenViking directly, not through the LiteLLM MCP gateway (tool-surface problem with the 9B model).
 - [ ] **Spec 08:** reword the hostname-allowlist criterion to the same GitHub-only proxy for the hermes pod (`REGISTRY_ONLY` does not block unregistered hosts in ambient).
 - [ ] **Spec 09:** drop the browser MCP and browser pod criteria; reword "fails fast when Ollama is down" to "bounded by the 180 s timeout".
 - [ ] **Spec 10:** reword the CI secret scan criterion to the pre-commit scan only (the `workflow` token scope is not added; the workflow file stays in `ci/`).

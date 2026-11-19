@@ -112,5 +112,27 @@ class Wrapper(unittest.TestCase):
         self.assertTrue(self.audit()[-1]["status"].startswith("error"))
 
 
+    def test_research_mode_limits_tools_and_uses_open_web_proxy(self):
+        self.write_fake('echo "$HTTPS_PROXY|$PWD" >> %s.env; cat' % self.log)
+        r = self.run_w(CLAUDE_HAIKU_WEB="1", HTTPS_PROXY="http://restricted:3128")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        argv = slurp(self.log)
+        self.assertIn('--tools WebSearch,WebFetch', argv)
+        self.assertIn('--permission-mode dontAsk', argv)
+        for t in ("Bash", "Edit", "Write", "Agent", "mcp__*"):
+            self.assertIn(t, argv.split("--disallowedTools")[1])
+        proxy, cwd = slurp(self.log + ".env").strip().split("|")
+        self.assertEqual(proxy, "http://squid.egress-proxy.svc:3129")   # not the pod-wide 3128 listener
+        self.assertNotEqual(cwd, os.getcwd())                             # empty scratch dir, no project settings
+
+    def test_default_mode_keeps_no_tools_and_pod_proxy(self):
+        self.write_fake('echo "$HTTPS_PROXY" >> %s.env; cat' % self.log)
+        r = self.run_w(HTTPS_PROXY="http://restricted:3128")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('--tools  ', slurp(self.log).replace('--tools ', '--tools  ', 1))
+        self.assertNotIn("WebFetch", slurp(self.log))
+        self.assertEqual(slurp(self.log + ".env").strip(), "http://restricted:3128")
+
+
 if __name__ == "__main__":
     unittest.main()

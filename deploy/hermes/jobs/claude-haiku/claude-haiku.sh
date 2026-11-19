@@ -47,8 +47,20 @@ IN="$(mktemp)"; trap 'rm -f "$IN"' EXIT; cat > "$IN"
 bytes=$(wc -c < "$IN"); t0=$(date +%s%3N)
 echo $((n+1)) > "$CNT"
 # --tools "": no tools. Telemetry and auto-update off; settings isolated on the PVC.
-CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/opt/data/claude}" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_TELEMETRY=1 \
-  timeout "$TMO" "$CLI" -p --model "$MODEL" --tools "" --output-format text < "$IN"
+# Default: no tools, text in and text out. Research mode (CLAUDE_HAIKU_WEB=1, spec 15): only WebSearch and WebFetch exist
+# (--tools limits the built-in set; --allowedTools only pre-approves), nothing else can prompt (dontAsk), and the CLI uses the
+# open-web proxy listener. Fetched pages are untrusted input; the model has no shell, file or MCP tool to act on them.
+ENVX=(CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/opt/data/claude}" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_TELEMETRY=1)
+if [ "${CLAUDE_HAIKU_WEB:-0}" = "1" ]; then
+  WEBPROXY="${CLAUDE_HAIKU_WEB_PROXY:-http://squid.egress-proxy.svc:3129}"
+  ENVX+=(HTTPS_PROXY="$WEBPROXY" https_proxy="$WEBPROXY")
+  ARGS=(--tools "WebSearch,WebFetch" --permission-mode dontAsk --allowedTools WebSearch WebFetch
+        --disallowedTools Bash Edit Write NotebookEdit Agent 'mcp__*' --max-turns "${CLAUDE_HAIKU_WEB_TURNS:-12}")
+  cd "$(mktemp -d)" || exit 1      # empty cwd: no project settings, hooks or .mcp.json to load
+else
+  ARGS=(--tools "")
+fi
+env "${ENVX[@]}" timeout "$TMO" "$CLI" -p --model "$MODEL" "${ARGS[@]}" --output-format text < "$IN"
 rc=$?
 audit "$([ $rc -eq 0 ] && echo ok || echo "error:$rc")" "$bytes" "$(( $(date +%s%3N) - t0 ))"
 exit $rc

@@ -1,16 +1,24 @@
-# Egress proxy for the Hermes nightly job (spec 11)
+# Egress proxy for the Hermes pod (specs 11, 12 and 15)
 
-The hermes pod has no direct internet route (`deploy/hermes/egress-networkpolicy.yaml`). The nightly job reaches GitHub through a Squid forward proxy in namespace `egress-proxy`, port 3128. The container sets `HTTPS_PROXY` (and `NO_PROXY` for cluster hosts), so the job and interactive Hermes both use it; the allowlist is the same for both.
+The hermes pod has no direct internet route (`deploy/hermes/egress-networkpolicy.yaml`). It reaches the internet through a Squid forward proxy in namespace `egress-proxy`. The container sets `HTTPS_PROXY` (and `NO_PROXY` for cluster hosts), so the nightly job, interactive Hermes and the Discord gateway all use it.
 
-- **Allowlist:** CONNECT on 443 to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`. Everything else gets 403 and is logged. Edit `squid.conf`.
-- **Who may call it:** AuthorizationPolicy `squid-from-hermes` allows only `cluster.local/ns/hermes/sa/hermes` on 3128 (deny-all baseline). The proxy's own egress is limited to DNS and port 443 on public addresses (`squid-egress`).
+| Listener | Port | Allows (CONNECT on 443) | Used by |
+|---|---|---|---|
+| restricted | 3128 | `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`, `api.anthropic.com`, `discord.com`, `.discord.gg`, `cdn.discordapp.com`, `media.discordapp.net` | everything in the pod by default (`HTTPS_PROXY`) |
+| research | 3129 | any public host | `claude-haiku.sh` with `CLAUDE_HAIKU_WEB=1` only (spec 15) |
+
+Both listeners deny private, loopback, link-local and CGNAT destinations by address, whatever the hostname resolves to (`private_dst` in `squid.conf`); the proxy's own NetworkPolicy also excludes the RFC 1918 ranges. Everything else gets 403 and is logged. Edit `squid.conf`.
+
+The split between the listeners is defence in depth: the local model and its shell tools hold `GITHUB_TOKEN` and follow `HTTPS_PROXY`, so they get only the restricted listener by configuration. A process in the pod can still call `:3129` explicitly, because the mesh admits the hermes service account on both ports. To turn research off, remove the `3129` rule from `deploy/hermes/egress-networkpolicy.yaml` (and `touch /opt/data/claude-haiku/disabled` stops every Haiku call).
+
+- **Who may call it:** AuthorizationPolicy `squid-from-hermes` allows only `cluster.local/ns/hermes/sa/hermes` on 3128 and 3129 (deny-all baseline). The proxy's own egress is limited to DNS and port 443 on public addresses (`squid-egress`).
 - **Why a proxy:** `outboundTrafficPolicy: REGISTRY_ONLY` is not enforced by ambient ztunnel (`deploy/istio/README.md`), a NetworkPolicy cannot match hostnames, and upstream Istio 1.30.8 has no documented way to make unregistered hosts fail. The options and the revisit triggers are in "Alternatives considered" below.
 - **Flux:** stage `egress` (`clusters/dsm-shai/egress.yaml`, dependsOn `platform` and `istio`); the `hermes` stage dependsOn it.
 - **Deviation from the spec:** the spec asked for SNI inspection (`ssl_bump peek` and `splice`). That needs an OpenSSL build of Squid and the pinned Ubuntu image is probably GnuTLS, so the allowlist is on the CONNECT target. Squid dials the allowed host itself, so a different SNI still only reaches GitHub. Use a `squid-openssl` image and add `ssl_bump` rules if SNI checking is wanted.
 
 ## Alternatives considered (decision 2026-11-17: keep Squid for now)
 
-Spec 08 names ServiceEntry plus a waypoint or egress gateway as the intended mechanism. Squid is a deliberate deviation for this one job. The owner reviewed the options and chose to keep Squid, and to revisit later.
+Spec 08 names ServiceEntry plus a waypoint or egress gateway as the intended mechanism. Squid is a deliberate deviation. The owner reviewed the options and chose to keep Squid, and to revisit later.
 
 | Option | What it gives | Why not now |
 |---|---|---|
@@ -39,3 +47,7 @@ After the merge Flux created the namespace and the pod (Ready). From the hermes 
 5. Other callers: from another namespace the proxy is refused (RBAC denied by `squid-from-hermes`).
 6. `kubectl -n egress-proxy logs deploy/squid` shows the allowed and denied requests.
 7. Mesh enrolment: if step 2 fails with a refused HBONE connection, delete the squid pod (see "Restart recovery" in `deploy/istio/README.md`).
+
+## Port 3129 and the Discord hosts: not yet verified (2026-11-18)
+
+Written and reviewed, not run. `squid -k parse` and the allow and deny checks for both listeners still have to run (Docker was unresponsive when this was written), then the in-cluster checks above repeated for `:3129`: allowed `https://example.com`, denied a 10.x address, denied from another namespace. Spec 15 lists them as acceptance criteria. For Discord, watch the Squid log on first connect: the gateway may use a host under `.discord.gg` other than `gateway.discord.gg`.

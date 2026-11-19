@@ -17,7 +17,7 @@ Let Hermes finish tasks on its own by splitting them across a swarm of workers: 
 
 **Concurrency and VRAM**
 - The GPU runs one chat model with `max_parallel_requests: 2` (spec 09), so the local pool is capped at 2 simultaneous workers. Haiku workers are capped at `SWARM_HAIKU_PARALLEL` (default 2, which matches the wrapper's `CLAUDE_HAIKU_PARALLEL`; raising it needs the wrapper variable raised too, and `swarm.py` refuses a value above it). A scheduler script (`swarm.py`) owns the queue so a third local call is never sent and 429s are not used as flow control. Local and Haiku work run concurrently; local work never exceeds 2.
-- Local worker calls go through LiteLLM with the `hermes` key; Haiku calls go through the wrapper only. Each step is a separate `hermes -z` call, direct LiteLLM request or wrapper call with a versioned prompt file, context under 16K tokens and a required output schema, as in spec 11.
+- Local worker calls go through LiteLLM with the `hermes` key; Haiku calls go through the wrapper only, with no tools (the wrapper's web research mode, spec 15, is not used by the swarm). Each step is a separate `hermes -z` call, direct LiteLLM request or wrapper call with a versioned prompt file, context under 16K tokens and a required output schema, as in spec 11.
 
 **Task plan and state**
 - A task is a YAML file with `goal`, `allowed_paths`, `max_steps`, `max_haiku_calls`, `timeout_minutes`, `verifiers`. The orchestrator writes a plan JSON (steps, dependencies, worker class), validated against a schema before any worker starts. An invalid plan is retried once, then the task fails.

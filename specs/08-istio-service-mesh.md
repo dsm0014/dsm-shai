@@ -1,8 +1,8 @@
 # Spec 08 — Istio Service Mesh
 
-**Status:** PARTIAL (ambient enrolment, identity policies, STRICT mTLS and rollback verified; hostname egress allowlist not met; see deploy/istio/README.md)
+**Status:** PARTIAL (ambient enrolment, identity policies, STRICT mTLS and rollback verified; hostname egress through the Squid proxy; see deploy/istio/README.md)
 
-> **Amendment (2026-11-17, spec 11):** the hostname egress allowlist is implemented for one case only: the hermes pod to five GitHub hosts, through a Squid proxy (`deploy/istio/egress/`), because `REGISTRY_ONLY` is not enforced by ambient ztunnel. Allowed callers of the proxy are limited by an AuthorizationPolicy to `cluster.local/ns/hermes/sa/hermes`. All other egress stays default-deny.
+> **Egress, current state:** hostname egress control is a Squid forward proxy (`deploy/istio/egress/`), because `REGISTRY_ONLY` is not enforced by ambient ztunnel. Only the hermes pod may call it (AuthorizationPolicy `squid-from-hermes`, principal `cluster.local/ns/hermes/sa/hermes`, ports 3128 and 3129). Port 3128 allows GitHub, `api.anthropic.com` and Discord; port 3129 allows any public host for Haiku research (spec 15). Private, loopback and link-local destinations are denied on both. All other namespaces stay default-deny.
 
 ## Purpose
 Adopt Istio (ambient mode) as the security, routing and egress-control layer of the single-node k3s stack, giving identity-based mTLS and authorization, a single ingress, and hostname-level egress control. It must fit within the ~24GB WSL2 RAM cap shared with a 14B model on one GPU.
@@ -17,7 +17,7 @@ Adopt Istio (ambient mode) as the security, routing and egress-control layer of 
 - **mTLS:** mesh-wide `PeerAuthentication` set to `STRICT`. Plaintext in-mesh traffic is rejected. Document any exceptions, such as Prometheus scrape targets, explicitly.
 - **Authorization:** each namespace gets a default-deny `AuthorizationPolicy` plus explicit per-service ALLOW rules keyed on ServiceAccount identity (for example, only litellm may call ollama). Remove the identity-based rules made redundant from specs 03/04/05 NetworkPolicies. Keep a baseline default-deny NetworkPolicy as defense-in-depth only where it is cheap, and do not duplicate L7 rules there.
 - **Ingress:** an Istio ingress gateway (`Gateway` + `HTTPRoute`/`VirtualService`) replaces Traefik as the single host-local entry point for Open WebUI and Grafana. Bind only to localhost / the host-local port. Nothing else is exposed.
-- **Egress:** set `outboundTrafficPolicy: REGISTRY_ONLY`. Define a `ServiceEntry` per allowed external hostname (the Hermes allowlist file lives in `deploy/istio/egress/`). Route Hermes through a waypoint (or an optional egress gateway) so unlisted hostnames are blocked. This resolves spec 04's open question on hostname-based egress. Keep the allowlist minimal and reviewable.
+- **Egress:** the hermes pod reaches the internet only through the Squid proxy in `egress-proxy` (see the egress note above). The allowlist is `deploy/istio/egress/squid.conf`, a NetworkPolicy removes every direct route, and an AuthorizationPolicy limits callers to the hermes service account. This resolves spec 04's question on hostname-based egress. The ServiceEntry-plus-waypoint design was evaluated and not adopted; the revisit triggers are in `deploy/istio/egress/README.md`.
 - **Ollama and streaming:** the Ollama route must set a long or disabled request timeout (≥ 10 minutes) and no idle timeout for streamed tokens. It must also set `retries.attempts: 0` so generations are never duplicated, and keep response buffering off (no buffering filters; SSE/chunked responses flush incrementally). Apply the same settings on the gateway route for Open WebUI streaming. Do not use L7 waypoint retries or buffering on the path unless these settings are verified.
 - **Telemetry:** Istio and ztunnel metrics (`istio_tcp_*`, plus waypoint `istio_requests_total`) are scraped by the spec 06 Prometheus. Ship a ServiceMonitor/PodMonitor and a Grafana mesh dashboard. Mind metric cardinality and retention on the single node.
 - **Kiali:** optional and off by default (`kiali.enabled=false`). When enabled it must fit the memory budget and sit behind the ingress gateway.
@@ -32,7 +32,7 @@ Adopt Istio (ambient mode) as the security, routing and egress-control layer of 
 - [ ] Measured memory of istiod + ztunnel + gateway (+ waypoints) stays within the documented budget, and Ollama with the 14B model loads without OOM.
 - [ ] A plaintext request from a non-mesh pod to a mesh workload is rejected.
 - [ ] An unauthorized caller (for example, open-webui calling ollama directly) receives 403 / RBAC denied; an authorized caller (litellm) succeeds.
-- [ ] From the hermes pod, a request to a non-allowlisted hostname fails and an allowlisted hostname succeeds.
+- [x] From the hermes pod on port 3128, a request to a non-allowlisted hostname fails and an allowlisted hostname succeeds (verified 2026-11-17).
 - [ ] A streaming chat completion through the mesh (Open WebUI -> LiteLLM -> Ollama) delivers tokens incrementally, without buffering, timeout, or duplicate generation on a long response.
 - [ ] Mesh metrics appear in Prometheus and in a Grafana dashboard; Kiali is off by default and works when enabled.
 - [ ] Hand-written NetworkPolicy rules replaced by identity-based policies are removed from specs 03/04/05; specs 05 and 06 no longer reference Traefik.

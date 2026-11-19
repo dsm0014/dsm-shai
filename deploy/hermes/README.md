@@ -113,7 +113,7 @@ A nightly job that evaluates the owner's `claude-specter` repository against ope
 | Clone and scratch | `/workspace/claude-specter`, `/tmp` (lost on restart; an interrupted run is abandoned) |
 | Settings (ConfigMap `nightly-specter-env`) | `NIGHTLY_ALLOWED_REPOS` (isolation guard: the job refuses any `NIGHTLY_REPO` not listed, in `run.sh` and `gh_api.repo()`; add the real repo here at go-live), `NIGHTLY_REPO` (owner/name; `dsm0014/claude-specter-auto`, the private rehearsal copy, until the real repo is switched in), `IMPL_PROBATION_NIGHTS=1`, caps 400 lines / 12 files, 5 repos, 3 specs, 90 min wall clock |
 | Token | Secret `hermes-github`, key `token`, env `GITHUB_TOKEN` (optional) |
-| Egress | `deploy/istio/egress/` (Squid, five GitHub hosts) |
+| Egress | `deploy/istio/egress/` (Squid: restricted listener `:3128` for GitHub, Anthropic and Discord; research listener `:3129`, Haiku only) |
 | Metrics and alerts | sidecar on 9101, `deploy/monitoring/extras/nightly-alerts.yaml` |
 
 **How a run works.** `run.sh` takes a `flock`, checks the configuration and the kill switches, then `orchestrate.py` clones the repo and `select_mode.py` picks the mode (the model never does). Every model call is one `hermes -z` with a versioned prompt and is followed by a script verifier; a step gets two attempts. `guard.py` checks the diff (paths, size, secrets, spec structure) before anything is pushed. The model's own claim of success is not used.
@@ -225,3 +225,11 @@ Haiku runs on your Claude subscription, not the API. No API key exists anywhere;
 **Data handling:** anything sent to Haiku is processed by Anthropic under your subscription's terms. Do not send memory dumps, secrets or personal data.
 
 **Egress:** the Squid proxy now also allows `api.anthropic.com`, so the Hermes pod can reach that one extra host; other namespaces cannot. **Rotation:** new `claude setup-token`, re-run `set-claude-token.sh`, commit, restart Hermes, preflight, revoke the old token.
+
+### Web research (spec 15)
+
+`CLAUDE_HAIKU_WEB=1 claude-haiku.sh` lets Haiku search and read the public web. Only `WebSearch` and `WebFetch` exist in that mode (Bash, Edit, Write, Agent and MCP tools are disallowed, `dontAsk`, 12 turns, an empty working directory), and the CLI uses the open-web proxy listener (`CLAUDE_HAIKU_WEB_PROXY`, default `http://squid.egress-proxy.svc:3129`). Everything else in the pod keeps the restricted listener. Fetched pages are untrusted: wrap the answer in `UNTRUSTED_CONTENT` markers before acting on it, and do not send secrets or personal data in the prompt. Calls count against the same daily cap and kill switches. **Not yet verified in the cluster** (spec 15 lists the checks, including whether `WebSearch` works on the subscription token). Off: remove the `3129` rule from `deploy/hermes/egress-networkpolicy.yaml`, or `touch /opt/data/claude-haiku/disabled` to stop every Haiku call.
+
+## Discord (spec 15, not built)
+
+The gateway the pod already runs has a Discord adapter. The design (owner-only allowlist, swarm `quick_commands`, a digest cron that posts results, `discord_admin` off) and the open questions are in `specs/15-hermes-discord.md`. The egress for it is in place (restricted listener allows the Discord hosts); the secret, config and `swarm-chat.sh` are not.

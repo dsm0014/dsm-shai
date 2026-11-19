@@ -2,7 +2,7 @@
 
 **Status:** PARTIAL (running headless and non-root; end-to-end task and OpenViking memory verified; browser MCP, LiteLLM MCP gateway and egress/NetworkPolicy pending; see deploy/hermes/README.md)
 
-> **Amendment (2026-11-17, spec 11):** the nightly specter job (spec 11) may reach five GitHub hosts through a forward proxy in namespace `egress-proxy` (port 3128), and the pod holds an optional repo-scoped `GITHUB_TOKEN`. The default-deny egress and the no-cluster-credentials rule are otherwise unchanged. Interactive Hermes uses the same proxy (`HTTPS_PROXY` is set on the container).
+> **Egress, current state (specs 11, 12 and 15):** the pod has no direct internet route. Everything leaves through the Squid forward proxy in namespace `egress-proxy`. Port 3128 (the pod-wide default, `HTTPS_PROXY`) tunnels HTTPS only to the five GitHub hosts, `api.anthropic.com` and the Discord hosts. Port 3129 tunnels HTTPS to any public host and is used only by `claude-haiku.sh` in research mode (spec 15). The pod holds an optional `GITHUB_TOKEN`. There are no cluster credentials.
 
 > **Pointer (spec 13):** swarm orchestration (Haiku plus local Qwen workers, scheduled jobs) lives in spec 13; Hermes runs it from `/opt/jobs/swarm`.
 
@@ -36,8 +36,8 @@ Run Hermes Agent (NousResearch/hermes-agent, MIT) in the k3s namespace `hermes`,
   - LiteLLM in namespace `litellm` on 4000 (Hermes has no direct route to Ollama).
   - OpenViking in namespace `openviking` on its service port.
   - kube-dns on 53 UDP/TCP.
-  - An explicit web allowlist (for example `github.com` and package registries), kept in a documented, editable manifest.
-- The web allowlist is enforced by Istio (spec 08): `outboundTrafficPolicy: REGISTRY_ONLY` plus a `ServiceEntry` per allowed hostname, routed via a waypoint or egress gateway. Direct egress to other destinations is blocked.
+  - The Squid egress proxy on 3128 (restricted hostname allowlist) and 3129 (open web, Haiku research only), plus the ambient HBONE tunnel on 15008. The allowlist is `deploy/istio/egress/squid.conf`.
+- The hostname allowlist is enforced by the Squid proxy (`deploy/istio/egress/`), not by `REGISTRY_ONLY` (ambient ztunnel does not enforce it, spec 08). The NetworkPolicy blocks every direct route, so the proxy is the only way out.
 - CPU and memory requests and limits are set on the container (e.g. 500m/2Gi requests, 2 CPU/4Gi limits). The workspace is size-bounded.
 
 **Operation**
