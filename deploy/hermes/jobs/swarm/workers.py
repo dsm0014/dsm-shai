@@ -24,11 +24,14 @@ def untrusted(label, text):
     return "%s %s\n%s\n%s" % (MARK_OPEN, label, text, MARK_CLOSE)
 
 
-def call_chat(prompt, timeout=180):
+def call_chat(prompt, timeout=180, json_mode=False):
     """Return (text, usage_dict). Never retried here; the scheduler owns retries."""
     key = os.environ.get("LITELLM_HERMES_KEY", "")
     max_tokens = int(os.environ.get("SWARM_CHAT_MAX_TOKENS", "8000"))  # thinking is on: a small cap can leave the reply empty
-    body = json.dumps({"model": "chat", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}).encode()
+    payload = {"model": "chat", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}  # the planner must return one JSON object
+    body = json.dumps(payload).encode()
     req = urllib.request.Request(LITELLM + "/chat/completions", data=body,
                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
     try:

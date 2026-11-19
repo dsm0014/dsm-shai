@@ -152,7 +152,7 @@ class Run:
         self.steps, self.outputs, self.stop = [], {}, False
 
     # ---- one worker call, under the caps ----------------------------------------------------------------------------
-    def call(self, tier, prompt):
+    def call(self, tier, prompt, json_mode=False):
         with self.lock:
             if time.time() > self.deadline:
                 raise Capped("timeout")
@@ -165,7 +165,7 @@ class Run:
             self.bytes["in"] += len(prompt)
         with self.sem[tier]:  # the scheduler is the only flow control; 429s are never used for it
             try:
-                text, usage = (workers.call_haiku if tier == "haiku" else workers.call_chat)(prompt)
+                text, usage = workers.call_haiku(prompt) if tier == "haiku" else workers.call_chat(prompt, json_mode=json_mode)
             except workers.HaikuUnavailable as e:
                 if tier == "haiku":
                     with self.lock:
@@ -183,7 +183,7 @@ class Run:
         for attempt in (1, 2):
             p = prompt_text("plan", goal=self.task["goal"], items=listing, max_steps=min(self.max_steps, MAX_PLAN_STEPS),
                             problems=("Your previous plan was invalid: " + "; ".join(problems)) if problems else "")
-            plan = json_in(self.call(tier, p))
+            plan = json_in(self.call(tier, p, json_mode=True))
             problems = ["the reply was not a single JSON object; reply with only the JSON object and no other text"] if plan is None else validate_plan(plan, items, self.max_steps)
             if not problems:
                 if len(plan["steps"]) > self.max_steps:
