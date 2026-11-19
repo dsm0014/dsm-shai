@@ -305,17 +305,16 @@ class Guards(RepoWorkCase):
         self.assertEqual(self.last()["status"], "ok", self.last())
         self.assertEqual(len([r for r in self.posts() if r[1].endswith("/pulls")]), 1)
 
-    def test_daily_limit_skips_after_a_pull_request_today(self):
+    def test_a_pull_request_earlier_today_does_not_block_a_new_run(self):
+        # The once-per-day limit was removed (owner decision 2026-11-19); only an OPEN swarm/ pull request blocks a run.
         os.makedirs(self.env.state, exist_ok=True)
         with open(os.path.join(self.env.state, "audit.jsonl"), "a") as f:
             f.write(json.dumps({"task": "repo-work-test", "kind": "repo_work", "status": "ok", "date": TODAY,
                                 "pr_url": "https://example.invalid/pr/6"}) + "\n")
-        rc, out, err = self.run_repo("--run-id", "run-limit")
+        rc, out, err = self.run_repo("--run-id", "run-again")
         self.assertEqual(rc, 0, out + err)
-        self.assertEqual(self.last()["status"], "skipped")
-        self.assertEqual(self.last()["reason"], "skipped: daily limit")
-        self.assertNoWorkerCalls()
-        self.assertNothingPushed()
+        self.assertEqual(self.last()["status"], "ok", self.last())
+        self.assertEqual(len([r for r in self.posts() if r[1].endswith("/pulls")]), 1)
 
     def test_no_eligible_task_skips(self):
         for label, text in (("unmarked only", "# Tasks\n- [ ] Plain item `docs/a.md`\n"),
