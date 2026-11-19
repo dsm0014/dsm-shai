@@ -57,7 +57,9 @@ def write_metrics(entries=None):
     last_ok = max([e.get("ts", 0) for e in real if e.get("status") == "ok"] or [0])
     last = 1 if (not real or real[-1]["status"] == "ok") else 0
     calls = sum(int(e.get("haiku_calls", 0)) for e in entries if not e.get("dry_run"))
-    body = ("# TYPE swarm_last_success_timestamp gauge\nswarm_last_success_timestamp %d\n"
+    prs = sum(1 for e in entries if e.get("pr_url") and not e.get("dry_run"))
+    body = ("# TYPE swarm_prs_opened_total counter\nswarm_prs_opened_total %d\n" % prs
+            + "# TYPE swarm_last_success_timestamp gauge\nswarm_last_success_timestamp %d\n"
             "# TYPE swarm_last_run_status gauge\nswarm_last_run_status %d\n"
             "# TYPE swarm_haiku_calls_total counter\nswarm_haiku_calls_total %d\n" % (last_ok, last, calls))
     os.makedirs(STATE, exist_ok=True)

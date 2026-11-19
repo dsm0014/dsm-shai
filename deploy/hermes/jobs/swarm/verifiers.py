@@ -2,7 +2,7 @@
 A step's `verify` list in the plan may only name verifiers from this table; the task file sets the defaults and the minimum."""
 import json, re
 
-SECRET_RES = [re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), re.compile(r"github[_]pat[_][A-Za-z0-9_]{20,}"), re.compile(r"sk-ant-[A-Za-z0-9_-]{10,}")]
+SECRET_RES = [re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), re.compile(r"github[_]pat[_][A-Za-z0-9_]{20,}"), re.compile(r"sk-ant[-][A-Za-z0-9_-]{10,}")]
 
 
 def v_nonempty(text, ctx):
@@ -50,7 +50,18 @@ def v_diff_allowed(text, ctx):
     return (changed <= int(ctx.get("max_diff_lines", 200)), "diff over the line cap")
 
 
-TABLE = {"nonempty": v_nonempty, "min_chars": v_min_chars, "max_chars": v_max_chars, "json": v_json,
+def v_file_block(text, ctx):
+    """A file-writing step must answer with one fenced block holding the whole new file."""
+    import re as _re
+    m = _re.search(r"^```[A-Za-z0-9_+.-]*\n", text, _re.M)
+    end = text.rfind("\n```")
+    body = text[m.end():end] if m and end >= m.end() - 1 else ""
+    if not body.strip():
+        return (False, "no fenced file block")
+    return (len(body.splitlines()) <= int(ctx.get("max_file_lines", 2000)), "file block too long")
+
+
+TABLE = {"file_block": v_file_block, "nonempty": v_nonempty, "min_chars": v_min_chars, "max_chars": v_max_chars, "json": v_json,
          "no_secrets": v_no_secrets, "cites_inputs": v_cites_inputs, "diff_allowed": v_diff_allowed}
 DEFAULT = ["nonempty", "no_secrets"]
 

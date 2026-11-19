@@ -328,6 +328,9 @@ def main(argv):
     if why:
         print("skipped: " + why); lib.audit({"task": name, "status": "skipped", "reason": why}); lib.write_metrics(); return 0
 
+    if task.get("kind") == "repo_work":  # spec 14: same caps, routing and kill switches, different flow
+        import repo_work
+        return repo_work.main(task, run, sys.modules[__name__], lockf, name)
     status, reason, report, t0 = "ok", "", "", time.time()
     plan = {"steps": []}
     try:
