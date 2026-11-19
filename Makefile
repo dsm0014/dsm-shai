@@ -76,5 +76,6 @@ nightly-status: ## Is it running, last audit entries, digest, metrics
 claude-haiku-preflight: ## Spec 12: is the Claude CLI and subscription token present in the pod (no call made)
 	@$(HERMES) bash /opt/jobs/claude-haiku/claude-haiku.sh --preflight $(QUIET)
 
-test: ## Run the nightly job's offline tests (no cluster needed)
+test: ## Run the offline tests (nightly job, Claude Haiku wrapper) (no cluster needed)
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh
+	python3 -I -m unittest discover -s deploy/hermes/jobs/claude-haiku/tests -p 'test_*.py' -v

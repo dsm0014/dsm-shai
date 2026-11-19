@@ -1,0 +1,52 @@
+# LiteLLM and its Postgres: default-deny egress (spec 12 follow-up; closes the direct-internet gap found 2026-11-18).
+# LiteLLM may reach cluster DNS, Ollama (11434), its own Postgres (5432) and the ambient HBONE tunnel (15008) only.
+# Postgres may reach DNS and HBONE only. The public internet, including api.anthropic.com, is refused.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-egress
+  namespace: litellm
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: litellm}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ollama}}
+      ports:
+        - {protocol: TCP, port: 11434}
+    - to:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: litellm-postgres}}
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 15008}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-postgres-egress
+  namespace: litellm
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: litellm-postgres}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 15008}

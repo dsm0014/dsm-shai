@@ -1,0 +1,25 @@
+# OpenViking: default-deny egress (spec 12 follow-up). It reaches cluster DNS, LiteLLM (4000, for embed and vision) and the
+# ambient HBONE tunnel (15008) only. The public internet is refused.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openviking-egress
+  namespace: openviking
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: litellm}}
+      ports:
+        - {protocol: TCP, port: 4000}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 15008}

@@ -35,16 +35,18 @@ Give Hermes access to Claude Haiku using the owner's Claude subscription, with n
 ## Verification notes (2026-11-18)
 
 - Through the proxy, the hermes pod reaches `api.anthropic.com` (squid log: `TCP_TUNNEL/200`) and is refused for other hosts (`TCP_DENIED/403` for `example.com`). A `litellm` pod is reset by the proxy (Istio policy allows only the hermes service account).
-- **Gap:** the `litellm` pod can still connect to `api.anthropic.com` directly. The `litellm` namespace has no default-deny egress NetworkPolicy, so the proxy restriction covers only the proxy path. This is pre-existing and not specific to Anthropic; closing it needs an egress NetworkPolicy for `litellm` and the other namespaces (separate task).
+- **Gap found and closed (same day):** the `litellm` pod could reach `api.anthropic.com` directly (a real HTTPS request returned HTTP 404 from Anthropic) because the `litellm` namespace had no egress NetworkPolicy. `deploy/litellm/egress-networkpolicy.yaml` (LiteLLM: DNS, Ollama 11434, Postgres 5432, HBONE 15008; Postgres: DNS and HBONE) and `deploy/openviking/egress-networkpolicy.yaml` (DNS, LiteLLM 4000, HBONE) now block it. Before and after were measured on the same pod: without the policy `REACHED (http 404)`, with it `SSLEOFError`. Chat, embed, models and OpenViking health still return 200 afterwards.
+- **Testing pitfall:** under ambient mode a plain TCP `connect()` always succeeds, because the in-pod redirect to ztunnel accepts the connection locally even when the onward hop is blocked. Egress tests must make a real HTTPS request and look for data. An earlier note here that every namespace was open was a false positive from a connect-only test.
+- Still without a default-deny egress policy: `ollama` (needs internet for model pulls), `monitoring`, `istio-system`.
 
 ## Acceptance Criteria
 
 - [ ] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret.
 - [x] The custom image builds and loads (`scripts/build-hermes-image.sh`), the pod runs from it as user 10000, and `claude --version` works in it. Verified 2026-11-18.
-- [x] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set. Pass case verified 2026-11-18; the fail-with-API-key case is not yet exercised.
+- [x] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set. Pass case verified in the pod; the fail-with-API-key case is verified offline by `make test`.
 - [x] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage. Verified: returned text in 1.9 s, one audit line (no content). The Anthropic console API-usage check is still open.
-- [ ] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI).
-- [ ] From the hermes pod `https://api.anthropic.com` works through the proxy; from another namespace it is refused; the proxy log shows the allowed call.
+- [x] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI). Verified offline: `make test` (9 tests, fake CLI) covers the disabled flag, missing token, daily cap, a 2-parallel cap with the third waiting, API key unset, timeout and no content in the audit.
+- [x] From the hermes pod `https://api.anthropic.com` works through the proxy; from another namespace it is refused; the proxy log shows the allowed call. Verified 2026-11-18 with real HTTPS requests: hermes via the proxy works, other hosts get 403, a `litellm` pod is reset by the proxy, and direct requests from `litellm`, `openviking`, `open-webui` and hermes are blocked.
 - [ ] `chat`, `embed` and `vision` through LiteLLM still work and LiteLLM has no Anthropic configuration.
 - [ ] Logs and audit files contain no prompt, response or token.
 - [ ] `CLAUDE.md` and `deploy/hermes/README.md` carry the amendment, the data-handling statement, the install steps and the rotation procedure.
