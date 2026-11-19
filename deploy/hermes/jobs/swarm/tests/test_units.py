@@ -67,7 +67,7 @@ class LoadTask(unittest.TestCase):
         self.assertEqual(t["source"], {"type": "github_changes", "commits": 5, "max_items": 6})
         self.assertEqual(t["allowed_paths"], [])
         self.assertEqual(t["max_steps"], 8)
-        self.assertEqual(t["max_haiku_calls"], 4)
+        self.assertEqual(t["max_haiku_calls"], 6)
         self.assertEqual(t["timeout_minutes"], 40)
         self.assertEqual(t["verifiers"], ["min_chars", "max_chars"])
         self.assertEqual((t["min_chars"], t["max_chars"]), (40, 4000))
