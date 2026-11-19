@@ -34,6 +34,12 @@ if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${NIGHTLY_REPO:-}" ]; then
   echo "not configured"; exit 0
 fi
 
+# Isolation guard: the token reaches every repo, so only an allowlisted target may run (fails closed).
+case ",${NIGHTLY_ALLOWED_REPOS:-}," in
+  *",$NIGHTLY_REPO,"*) ;;
+  *) audit refused "refused: NIGHTLY_REPO not in NIGHTLY_ALLOWED_REPOS"; echo "refused: NIGHTLY_REPO not in NIGHTLY_ALLOWED_REPOS" >&2; exit 2;;
+esac
+
 if [ -f "$STATE/disabled" ]; then
   audit skipped "skipped: disabled flag"; echo "skipped: disabled flag"; exit 0
 fi

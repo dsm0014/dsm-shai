@@ -128,7 +128,7 @@ class Env:
         self.srv, self.api = start_stub()
         self.state = os.path.join(self.root, "state")
         hb = os.path.join(self.root, "hermes"); open(hb, "w").write(STUB_HERMES); os.chmod(hb, 0o755)
-        self.env = dict(os.environ, NIGHTLY_STATE=self.state, NIGHTLY_REPO="acme/target", GITHUB_TOKEN=FAKE_TOKEN,
+        self.env = dict(os.environ, NIGHTLY_STATE=self.state, NIGHTLY_REPO="acme/target", NIGHTLY_ALLOWED_REPOS="acme/target", GITHUB_TOKEN=FAKE_TOKEN,
                         NIGHTLY_API_BASE=self.api, NIGHTLY_CLONE_URL=self.remote, HERMES_BIN=hb,
                         NIGHTLY_WORK=os.path.join(self.root, "work"), PYTHONDONTWRITEBYTECODE="1", NIGHTLY_STEP_TIMEOUT="30")
         self.env.update(extra)

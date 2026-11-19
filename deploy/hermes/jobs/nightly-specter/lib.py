@@ -61,7 +61,7 @@ def clean_nights(entries=None):
     n = 0
     for e in reversed(entries):
         st = e.get("status")
-        if e.get("dry_run") or st in ("skipped", "held", "not_configured", "paused"):
+        if e.get("dry_run") or st in ("skipped", "held", "not_configured", "paused", "refused"):
             continue
         if st == "ok":
             n += 1
@@ -75,7 +75,7 @@ def consecutive_failures(entries=None):
     n = 0
     for e in reversed(entries):
         st = e.get("status")
-        if e.get("dry_run") or st in ("skipped", "held", "not_configured", "paused"):
+        if e.get("dry_run") or st in ("skipped", "held", "not_configured", "paused", "refused"):
             continue
         if st == "failed":
             n += 1
