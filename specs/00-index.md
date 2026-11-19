@@ -17,6 +17,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 11 | [Nightly Specter Improvement](./11-nightly-specter-improvement.md) | PARTIAL | Built, merged and running inert (proxy and preflight verified in the cluster). Open: GitHub token, `hermes pause` test, fork rehearsal, cron entry, go-live |
 | 12 | [Claude Haiku via Claude Code CLI](./12-anthropic-litellm-key.md) | IN PROGRESS | Live: image, token, wrapper call and proxy path verified 2026-11-18. Egress gap closed with litellm and openviking egress policies; wrapper offline tests pass. Open: the Anthropic console API-usage check, LiteLLM vision regression check, and egress policies for ollama, monitoring and istio-system. Subscription only, no API key |
 | 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | TODO | Reconciled with spec 12 (2026-11-18); not yet implemented |
+| 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | TODO | Not started; builds on specs 11, 12 and 13 |
 
 ## Measured footprint (2026-11-16)
 
