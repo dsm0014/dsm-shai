@@ -70,13 +70,16 @@ def static_plan(task_info):
 def extract_block(text):
     """The file is everything between the opening fence line and the LAST closing fence, so a file that contains its own
     code fences (markdown) is kept whole."""
-    m = re.search(r"^```[A-Za-z0-9_+.-]*\n", text, re.M)
+    m = re.search(r"^```[^\n]*\n", text, re.M)  # the first fence line, whatever its info string ("file", "file path/x.md", "markdown")
     if not m:
         return None
     end = text.rfind("\n```")
     if end < m.end() - 1:
         return None
-    return text[m.end():end] + "\n"
+    body = text[m.end():end]
+    # the model sometimes echoes the delimiter lines it was given; they are never part of a file
+    body = "\n".join(l for l in body.split("\n") if l.strip() not in (workers.MARK_OPEN, workers.MARK_CLOSE) and not l.startswith(workers.MARK_OPEN + " "))
+    return body + "\n"
 
 
 def check_plan(plan, files):

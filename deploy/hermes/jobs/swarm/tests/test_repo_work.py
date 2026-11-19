@@ -518,3 +518,20 @@ class ShrinkGuard(RepoWorkCase):
         rc, out, err = self._run_with(66)
         self.assertEqual(rc, 0, out + err)
         self.assertEqual(self.last()["status"], "ok", self.last())
+
+
+class ExtractBlock(unittest.TestCase):
+    """Live bug 2026-11-19: the worker opened with ```file docs/architecture.md and the extractor latched onto a later inner fence."""
+
+    def test_opening_fence_with_a_path_keeps_inner_fences(self):
+        reply = "```file docs/a.md\n# T\n\n```bash\nmake test\n```\n\nend\n```"
+        self.assertEqual(repo_work.extract_block(reply), "# T\n\n```bash\nmake test\n```\n\nend\n")
+
+    def test_echoed_delimiter_lines_are_dropped(self):
+        reply = "```file\nline one\nUNTRUSTED_CONTENT>>>\nline two\n<<<UNTRUSTED_CONTENT input docs/a.md\n```"
+        self.assertEqual(repo_work.extract_block(reply), "line one\nline two\n")
+
+    def test_plain_and_language_fences_still_work(self):
+        self.assertEqual(repo_work.extract_block("```\nx\n```"), "x\n")
+        self.assertEqual(repo_work.extract_block("Sure!\n```markdown\n# H\n```\nDone."), "# H\n")
+        self.assertIsNone(repo_work.extract_block("no fence here"))

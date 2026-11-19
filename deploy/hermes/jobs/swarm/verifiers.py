@@ -53,7 +53,7 @@ def v_diff_allowed(text, ctx):
 def v_file_block(text, ctx):
     """A file-writing step must answer with one fenced block holding the whole new file."""
     import re as _re
-    m = _re.search(r"^```[A-Za-z0-9_+.-]*\n", text, _re.M)
+    m = _re.search(r"^```[^\n]*\n", text, _re.M)
     end = text.rfind("\n```")
     body = text[m.end():end] if m and end >= m.end() - 1 else ""
     if not body.strip():
