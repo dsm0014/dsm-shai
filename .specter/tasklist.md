@@ -10,7 +10,6 @@ Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered pau
 
 - [ ] **Close spec 12 (S, needs you):** the Anthropic console API-usage check, and one `vision` request through LiteLLM (needs the Open WebUI key; I will not use the master key). Then set spec 12 DONE in the index.
 - [ ] **Build spec 14 with `/do-spec` (L):** `pick-task.py`, the repo-work job, guards, offline tests, then the rehearsal-repo live check. Queue tasks by adding `[swarm]` to a task line.
-- [ ] **Nightly `register-cron.sh` (S):** Hermes accepts only a filename under `/opt/data/scripts` for `--script`; the nightly job's script still passes an absolute path (see the swarm script for the fix).
 
 ## 0b. Spec 15: Discord, swarm commands, Haiku web research
 
@@ -54,7 +53,7 @@ The decisions are made; the criteria still demand the work, so these specs canno
 ## 5. Spec 11: nightly specter improvement (built, merged, inert)
 
 - [~] **Rehearse on the rehearsal repo** (`dsm0014/claude-specter-auto`): the first dry run passed (Mode A, 3 specs, nothing pushed). Still to do: a second dry run to confirm the two bug fixes, a live Mode A run (spec PR merges), Mode B (implementation PR), forced failure, `hermes pause`, one-PR-per-night.
-- [ ] **Register the cron entry paused** with `register-cron.sh`; check that `hermes cron create --script` accepts the path.
+- [ ] **Register the cron entry paused** with `register-cron.sh --apply` (it now writes the wrapper under `/opt/data/scripts`, the only place `--script` accepts).
 - [ ] **Go live:** point `NIGHTLY_REPO` at the real repo, `hermes cron resume`, confirm the first night's audit and digest, then set the spec 11 index row to DONE.
 
 ## 6. Housekeeping
