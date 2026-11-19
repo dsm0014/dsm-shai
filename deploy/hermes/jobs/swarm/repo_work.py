@@ -141,7 +141,7 @@ def main(task, run, swarm, lockf, state_name):
             items.append({"id": f, "text": text})
         # plan with the orchestrator, then run the steps under the swarm's caps
         run.task["goal"] = "Complete this repository task by editing the listed files, one step per file: " + info["text"]
-        run.task["verifiers"] = ["file_block"]
+        run.task["verifiers"] = ["file_block", "keeps_size"]
         tier = "chat" if run.orch == "chat" else "haiku"
         problems = []
         for _ in (1, 2):
@@ -153,8 +153,12 @@ def main(task, run, swarm, lockf, state_name):
                 break
         if problems:
             raise swarm.Failed("invalid plan: " + "; ".join(problems)[:160])
+        text_of = {i["id"]: i["text"] for i in items}
         for s in plan["steps"]:
-            s["instruction"] = s["instruction"] + "\nTask: " + info["text"] + "\nReply with the COMPLETE new content of the file in one fenced block (```file ... ```), nothing else."
+            s["orig_len"] = 0 if text_of[s["inputs"][0]] == "(new file)" else len(text_of[s["inputs"][0]])
+            s["min_keep_pct"] = envint("SWARM_MIN_KEEP_PCT", 70)
+            s["instruction"] = (s["instruction"] + "\nTask: " + info["text"] + "\nReply with the COMPLETE new content of the file in one fenced block (```file ... ```), nothing else. "
+                                "Return the WHOLE file: every line that does not need to change must be copied unchanged. Do not return only the changed part.")
         run.execute(plan, items)
         # apply
         for s in plan["steps"]:

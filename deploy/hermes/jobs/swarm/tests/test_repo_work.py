@@ -487,7 +487,7 @@ class FileSizeAndDeletionGuards(RepoWorkCase):
         rc, out, err = self.run_repo("--run-id", "run-shrink", SWARM_CLONE_URL=self._big_remote(60))
         self.assertEqual(rc, 1, out + err)
         self.assertEqual(self.last()["status"], "failed")
-        self.assertTrue("shrank" in self.last()["reason"] or "deletes too much" in self.last()["reason"], self.last()["reason"])
+        self.assertIn("failed its verifier", self.last()["reason"])  # the size check is now a step verifier (retried, then escalated)
         self.assertEqual(self.branches(), [])
         self.assertEqual(self.posts(), [])
 
@@ -510,7 +510,8 @@ class ShrinkGuard(RepoWorkCase):
     def test_cut_down_file_is_rejected(self):
         rc, out, err = self._run_with(3)
         self.assertEqual(rc, 1, out + err)
-        self.assertIn("shrank", self.last()["reason"])
+        self.assertIn("failed its verifier", self.last()["reason"])
+        self.assertIn("returned", self.last()["steps"][0]["fails"][-1])
         self.assertEqual(self.branches(), [])
         self.assertEqual(self.posts(), [])
 
@@ -547,3 +548,25 @@ class DeployClass(unittest.TestCase):
     def test_manifests_and_mesh_config_under_deploy_still_are(self):
         for p in ("deploy/foo/bar.yaml", "deploy/istio/README.md", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
             self.assertTrue(repo_work.deploy_class(p), p)
+
+
+class KeepsSizeVerifier(RepoWorkCase):
+    """Live bug 2026-11-19: the worker returned a 5% snippet. The size check is a step verifier, so the ladder retries and escalates."""
+
+    def test_snippet_is_retried_then_a_whole_file_is_accepted(self):
+        files = seed_files()
+        files["docs/a.md"] = "\n".join("line %d of the document, with some text in it" % i for i in range(70)) + "\n"
+        remote = make_remote(self.root, "snip", files)
+        whole = "\n".join("line %d of the document, with some text in it" % i for i in range(70)) + "\nmentions docs/a.md"
+        replies = []
+
+        def worker(prompt):
+            replies.append(1)
+            return fence("just a snippet, mentions docs/a.md") if len(replies) == 1 else fence(whole)
+        self.env.gateway.reply = reply_for(["docs/a.md"], worker=worker)
+        rc, out, err = self.run_repo("--run-id", "run-snip", SWARM_CLONE_URL=remote)
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(self.last()["status"], "ok", self.last())
+        step = self.last()["steps"][0]
+        self.assertEqual(step["attempts"], 2)
+        self.assertIn("returned", step["fails"][0])
