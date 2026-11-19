@@ -32,7 +32,7 @@ Adopt Istio (ambient mode) as the security, routing and egress-control layer of 
 - [ ] Measured memory of istiod + ztunnel + gateway (+ waypoints) stays within the documented budget, and Ollama with the 14B model loads without OOM.
 - [ ] A plaintext request from a non-mesh pod to a mesh workload is rejected.
 - [ ] An unauthorized caller (for example, open-webui calling ollama directly) receives 403 / RBAC denied; an authorized caller (litellm) succeeds.
-- [x] From the hermes pod on port 3128, a request to a non-allowlisted hostname fails and an allowlisted hostname succeeds (verified 2026-11-17).
+- [ ] The hermes pod reaches only a GitHub-only proxy: from the hermes pod, a request to a GitHub hostname via the proxy on port 3128 succeeds and a request to any non-GitHub hostname fails. Istio `REGISTRY_ONLY` does not block unregistered hosts in ambient mode, so the allowlist must be enforced by the proxy, not by `REGISTRY_ONLY`.
 - [ ] A streaming chat completion through the mesh (Open WebUI -> LiteLLM -> Ollama) delivers tokens incrementally, without buffering, timeout, or duplicate generation on a long response.
 - [ ] Mesh metrics appear in Prometheus and in a Grafana dashboard; Kiali is off by default and works when enabled.
 - [ ] Hand-written NetworkPolicy rules replaced by identity-based policies are removed from specs 03/04/05; specs 05 and 06 no longer reference Traefik.
