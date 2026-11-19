@@ -136,7 +136,9 @@ class Run:
         self.id = args[args.index("--run-id") + 1] if "--run-id" in args else time.strftime("%Y%m%dT%H%M%S")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", self.id) or ".." in self.id:
             refuse("bad run id")
-        self.orch = os.environ.get("SWARM_ORCHESTRATOR", "haiku")
+        self.orch = os.environ.get("SWARM_ORCHESTRATOR") or "haiku"  # empty (an unset make variable) means the default
+        if self.orch not in ("haiku", "chat"):
+            refuse("SWARM_ORCHESTRATOR must be haiku or chat")
         self.haiku_par = envint("SWARM_HAIKU_PARALLEL", 2)
         self.max_steps = int(task.get("max_steps", 12))
         self.max_haiku = int(task.get("max_haiku_calls", 10))
@@ -286,9 +288,10 @@ class Run:
             sid = r.headers.get("Mcp-Session-Id")
             r.read()
             rpc("notifications/initialized", {}, sid, None).read()
-            txt = "Swarm task %s run %s (%s): %s" % (task_name, self.id, lib.today(), report[:1500])
-            out = rpc("tools/call", {"name": "remember", "arguments": {"content": txt}}, sid, 2).read().decode()
-            return '"isError":true' not in out.replace(" ", "") and "error" not in out[:80].lower()
+            msgs = [{"role": "user", "content": "Swarm task %s run %s (%s): %s" % (task_name, self.id, lib.today(), self.task["goal"])},
+                    {"role": "assistant", "content": report[:1500]}]  # the tool takes a short two-message exchange, not a bare string
+            out = rpc("tools/call", {"name": "remember", "arguments": {"messages": msgs}}, sid, 2).read().decode().replace(" ", "")
+            return '"isError":false' in out
         except (OSError, ValueError):
             return False
 
