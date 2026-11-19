@@ -309,3 +309,55 @@ class ModelFailures(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Remember(unittest.TestCase):
+    """The OpenViking `remember` call: a short two-message exchange over MCP, success only when isError is false."""
+
+    def _stub(self, is_error):
+        import http.server, threading
+        seen = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                msg = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                seen.append((msg.get("method"), msg.get("params"), self.headers.get("X-API-Key")))
+                body = b"" if "id" not in msg else (b"event: message\r\ndata: " + json.dumps(
+                    {"jsonrpc": "2.0", "id": msg["id"], "result": {"isError": is_error, "content": []}}).encode() + b"\r\n\r\n")
+                self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.shutdown)
+        return "http://127.0.0.1:%d/mcp" % srv.server_address[1], seen
+
+    def _run(self, is_error):
+        url, seen = self._stub(is_error)
+        env = open_env(self)
+        rc, out, err = run_swarm(write_task(_tmpdir(self)), "--run-id", "rem", SWARM_OPENVIKING_MCP=url, OPENVIKING_KEY="k-" + "x" * 10)
+        self.assertEqual(rc, 0, out + err)
+        return env.audit()[-1], seen
+
+    def test_remember_sends_messages_and_is_recorded(self):
+        last, seen = self._run(False)
+        self.assertTrue(last["remembered"], last)
+        call = [p for m, p, k in seen if m == "tools/call"][0]
+        self.assertEqual(call["name"], "remember")
+        self.assertEqual([m["role"] for m in call["arguments"]["messages"]], ["user", "assistant"])
+        self.assertTrue(all(k == "k-" + "x" * 10 for _, _, k in seen))
+
+    def test_remember_error_is_not_recorded_as_stored(self):
+        last, _ = self._run(True)
+        self.assertFalse(last["remembered"], last)
+
+
+class OrchestratorSetting(unittest.TestCase):
+    def test_empty_orchestrator_means_default_and_garbage_is_refused(self):
+        env = open_env(self)
+        rc, out, err = run_swarm(write_task(_tmpdir(self)), "--dry-run", SWARM_ORCHESTRATOR="")
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(env.audit()[-1]["orchestrator"], "haiku")
+        rc, out, err = run_swarm(write_task(_tmpdir(self)), "--dry-run", SWARM_ORCHESTRATOR="gpt")
+        self.assertEqual(rc, 2, out + err)
