@@ -32,12 +32,17 @@ Give Hermes access to Claude Haiku using the owner's Claude subscription, with n
 **Privacy**
 - Anything sent to Haiku is processed by Anthropic under the consumer terms of the subscription. The README lists what must not be sent (memory dumps, secrets, personal data). A request goes to Haiku only when a caller invokes the wrapper.
 
+## Verification notes (2026-11-18)
+
+- Through the proxy, the hermes pod reaches `api.anthropic.com` (squid log: `TCP_TUNNEL/200`) and is refused for other hosts (`TCP_DENIED/403` for `example.com`). A `litellm` pod is reset by the proxy (Istio policy allows only the hermes service account).
+- **Gap:** the `litellm` pod can still connect to `api.anthropic.com` directly. The `litellm` namespace has no default-deny egress NetworkPolicy, so the proxy restriction covers only the proxy path. This is pre-existing and not specific to Anthropic; closing it needs an egress NetworkPolicy for `litellm` and the other namespaces (separate task).
+
 ## Acceptance Criteria
 
 - [ ] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret.
-- [ ] The custom image builds and loads (`scripts/build-hermes-image.sh`), the pod runs from it as user 10000, and `claude --version` works in it.
-- [ ] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set.
-- [ ] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage.
+- [x] The custom image builds and loads (`scripts/build-hermes-image.sh`), the pod runs from it as user 10000, and `claude --version` works in it. Verified 2026-11-18.
+- [x] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set. Pass case verified 2026-11-18; the fail-with-API-key case is not yet exercised.
+- [x] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage. Verified: returned text in 1.9 s, one audit line (no content). The Anthropic console API-usage check is still open.
 - [ ] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI).
 - [ ] From the hermes pod `https://api.anthropic.com` works through the proxy; from another namespace it is refused; the proxy log shows the allowed call.
 - [ ] `chat`, `embed` and `vision` through LiteLLM still work and LiteLLM has no Anthropic configuration.
