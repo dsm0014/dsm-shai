@@ -8,7 +8,7 @@ Specs 01, 04 to 08 and 10 to 13 are not DONE. Most of the gap is bookkeeping (se
 
 Goal: Hermes works on the repo autonomously. Spec 12 (Haiku wrapper) is live; spec 13 (swarm) is reconciled with it and not built. Do these in order.
 
-- [ ] **Close spec 12 (S):** verify `chat`/`embed`/`vision` through LiteLLM and that LiteLLM has no Anthropic config; grep logs and `audit.jsonl` for prompt, response or token content; add the data-handling statement, install steps and rotation to `CLAUDE.md` and `deploy/hermes/README.md`; tick the criteria. Needs you: the Anthropic console API-usage check.
+- [ ] **Close spec 12 (S):** remaining: one `vision` request through LiteLLM (needs the Open WebUI key), and the Anthropic console API-usage check (needs you). Then set spec 12 DONE in the index.
 - [ ] **Build spec 13 with `/do-spec` (L):** `route.py`, `swarm.py` (2 local, 2 Haiku), verifiers, state and audit, `swarm-*` Make targets, `swarm-template` and `swarm-example`, offline tests with a fake gateway. Then a live `swarm-example` run and the cron entry registered paused.
 - [ ] **Spec 11 isolation guard (S, also in section 5):** do it first. The swarm reuses the same fail-closed repo rule (`SWARM_ALLOWED_REPOS`), because the GitHub token now covers all repos.
 - [ ] **Spec 14, autonomous repo work (needs `/new-spec`):** a swarm job that takes a task from this tasklist, works in a branch, opens a PR for you to merge, and never merges itself. Write it only after the spec 13 live run passes.

@@ -41,12 +41,12 @@ Give Hermes access to Claude Haiku using the owner's Claude subscription, with n
 
 ## Acceptance Criteria
 
-- [ ] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret.
+- [x] `deploy/secrets/hermes-claude.sops.yaml` is ciphertext only; `scripts/check-sops.sh` (with the `sk-ant-` pattern) passes; the token appears only in the `hermes` namespace Secret. Verified 2026-11-19: `check-sops.sh` passes; the only Secret with a Claude token key in the cluster is `hermes/hermes-claude`.
 - [x] The custom image builds and loads (`scripts/build-hermes-image.sh`), the pod runs from it as user 10000, and `claude --version` works in it. Verified 2026-11-18.
 - [x] `make claude-haiku-preflight` passes in the pod, and fails when `ANTHROPIC_API_KEY` is set. Pass case verified in the pod; the fail-with-API-key case is verified offline by `make test`.
 - [x] `echo "reply OK" | claude-haiku.sh` in the pod returns text, writes one audit line, and the Anthropic console shows no API usage. Verified: returned text in 1.9 s, one audit line (no content). The Anthropic console API-usage check is still open.
 - [x] The wrapper refuses to run with the `disabled` flag, without a token, and after the daily cap; two parallel calls run and a third waits (offline test with a fake CLI). Verified offline: `make test` (9 tests, fake CLI) covers the disabled flag, missing token, daily cap, a 2-parallel cap with the third waiting, API key unset, timeout and no content in the audit.
 - [x] From the hermes pod `https://api.anthropic.com` works through the proxy; from another namespace it is refused; the proxy log shows the allowed call. Verified 2026-11-18 with real HTTPS requests: hermes via the proxy works, other hosts get 403, a `litellm` pod is reset by the proxy, and direct requests from `litellm`, `openviking`, `open-webui` and hermes are blocked.
-- [ ] `chat`, `embed` and `vision` through LiteLLM still work and LiteLLM has no Anthropic configuration.
-- [ ] Logs and audit files contain no prompt, response or token.
-- [ ] `CLAUDE.md` and `deploy/hermes/README.md` carry the amendment, the data-handling statement, the install steps and the rotation procedure.
+- [ ] `chat`, `embed` and `vision` through LiteLLM still work and LiteLLM has no Anthropic configuration. Partly verified 2026-11-19: `chat` (hermes key, 200) and `embed` (200 in the LiteLLM log from the real consumer); LiteLLM ConfigMap and Deployment contain no Anthropic or Claude string. Open: a `vision` request (needs the Open WebUI consumer key; no request seen in 24 h).
+- [x] Logs and audit files contain no prompt, response or token. Verified 2026-11-19: LiteLLM logs (24 h) have no `anthropic`, `sk-ant` or key strings; `claude-haiku/audit.jsonl` holds only time, status, model, bytes and duration.
+- [x] `CLAUDE.md` and `deploy/hermes/README.md` carry the amendment, the data-handling statement, the install steps and the rotation procedure. Verified 2026-11-19.
