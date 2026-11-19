@@ -209,7 +209,7 @@ Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps
 
 **Make targets:** `swarm-preflight`, `swarm-plan TASK=<name>` (dry run: a scripted plan, no model call, spends nothing; a live run asks the orchestrator), `swarm-run TASK=<name>` (background, log at `/opt/data/swarm/<name>.log`; `SWARM_ORCHESTRATOR=chat` and `SWARM_HAIKU_PARALLEL=n` pass through), `swarm-status`, `swarm-stop`, `swarm-test` (offline).
 
-**New job from the template:** copy `deploy/hermes/jobs/swarm-template/` to `deploy/hermes/jobs/swarm-<name>/`, edit `task.yaml`, add its files to the `hermes-swarm` generator in `kustomization.yaml` and a volume and mount in `hermes.yaml` (same as `swarm-example`), add the repo to `SWARM_ALLOWED_REPOS`, test with `make swarm-plan TASK=swarm-<name>`, then `register-cron.sh <name>` (prints the paused `hermes cron create` command; `--apply` runs it) and `hermes cron resume <id>` when ready.
+**New job from the template:** copy `deploy/hermes/jobs/swarm-template/` to `deploy/hermes/jobs/swarm-<name>/`, edit `task.yaml`, add its files to the `hermes-swarm` generator in `kustomization.yaml` and a volume and mount in `hermes.yaml` (same as `swarm-example`), add the repo to `SWARM_ALLOWED_REPOS`, test with `make swarm-plan TASK=swarm-<name>`, then `register-cron.sh <name>` (prints the paused `hermes cron create` command; `--apply` writes a wrapper into `/opt/data/scripts/`, which is the only place Hermes accepts a `--script` from, and runs it) and `hermes cron resume <id>` when ready.
 
 ## Claude Haiku through the Claude Code CLI (spec 12)
 
