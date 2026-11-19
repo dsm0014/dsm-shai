@@ -16,7 +16,7 @@
 |--------------------------|--------------------------------------------|
 | CPU                      | Intel i7-13700KF (16C/24T)                |
 | GPU                      | NVIDIA RTX 4080, 16 GB VRAM               |
-| Host RAM                 | 32 GB (WSL exposed: ~24 GB)                |
+| Host RAM                 | 32 GB (WSL exposed: ~15 GB default)        |
 | Disk                     | WSL ext4 volume (~950 GB free)             |
 | Host OS                  | Windows 11                                 |
 | Cluster                  | k3s single-node, containerd, GPU plugin    |
