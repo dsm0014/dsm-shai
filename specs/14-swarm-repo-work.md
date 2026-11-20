@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Let the Hermes swarm (spec 13) work through this repository's task list unattended: pick one eligible task, make the change on a branch with Haiku and local Qwen workers, prove it with scripts, and open a pull request for the owner to merge. The swarm never merges its own pull request. Depends on specs 11 (GitHub egress and token handling), 12 (Haiku wrapper) and 13 (swarm engine and caps).
+Let the Hermes swarm (spec 13) work through this repository's task list unattended: pick one eligible task, make the change on a branch with Haiku and local Qwen workers, prove it with scripts, and open a pull request for the owner to merge. The swarm never merges its own pull request. Depends on specs 11 (GitHub egress and token handling), 12 (Haiku wrapper) and 13 (swarm engine and caps). The repo maintainer (spec 16) reviews and merges the pull requests this job opens and can start it.
 
 ## Behavior
 
