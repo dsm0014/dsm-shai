@@ -11,7 +11,7 @@ STATE = os.environ.get("MAINT_STATE", "/opt/data/maintainer")
 SWARM_STATE = os.environ.get("SWARM_STATE", "/opt/data/swarm")
 MODES = ("observe", "merge", "merge-and-run")
 SEVERE = ("forbidden", "foreign", "unticked", "deletion", "tasklist")  # gate failures that close instead of waiting for a fix
-DEFAULTS = {"mode": "observe", "max_merges_per_run": 1, "max_merges_per_day": 8, "max_attempts": 2, "reviewer": "haiku",
+DEFAULTS = {"mode": "observe", "max_merges_per_run": 1, "max_merges_per_day": 100, "max_attempts": 2, "reviewer": "haiku",
             "branch_prefix": "swarm/", "tasklist_path": ".specter/tasklist.md", "merge_deploy": False, "auto_queue": False}
 
 
@@ -105,7 +105,9 @@ def load_repos():
         cfg.setdefault(r, {})
     out = {}
     for repo, over in cfg.items():
-        s = dict(DEFAULTS, mode=os.environ.get("MAINT_MODE_DEFAULT", "observe"), reviewer=os.environ.get("MAINT_REVIEWER", "haiku"))
+        s = dict(DEFAULTS, mode=os.environ.get("MAINT_MODE_DEFAULT", "observe"), reviewer=os.environ.get("MAINT_REVIEWER", "haiku"),
+                 max_merges_per_day=envint("MAINT_MAX_MERGES_PER_DAY", DEFAULTS["max_merges_per_day"]),  # env sets the default; repos.yaml overrides per repo
+                 max_merges_per_run=envint("MAINT_MAX_MERGES_PER_RUN", DEFAULTS["max_merges_per_run"]))
         s.update(over)
         s["repo"] = repo
         out[repo] = s
