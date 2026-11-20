@@ -1,6 +1,6 @@
 # deploy/open-webui
 
-Open WebUI (spec 05), namespace `open-webui`. Host name `open-webui.localhost`, routed by the Istio ingress gateway. Status: **working through ingress**; mesh policy and egress limits are pending (step 11).
+Open WebUI (spec 05), namespace `open-webui`. Host name `open-webui.localhost`, routed by the Istio ingress gateway. Status: **working through ingress**; the Istio ingress policy and the egress NetworkPolicy (cluster DNS, LiteLLM on port 4000 and the HBONE tunnel only) are deployed, and only the live blocked-path test and the LAN and Windows checks remain (step 11).
 
 ## Image
 
@@ -42,7 +42,7 @@ Open WebUI (spec 05), namespace `open-webui`. Host name `open-webui.localhost`, 
 
 ## Not yet verified (step 11, spec 08 part B)
 
-- From the Open WebUI pod: LiteLLM and DNS allowed; direct Ollama, arbitrary external IPs and other in-cluster services blocked. Today the pod network is open, so these are not yet blocked.
+- The egress NetworkPolicy now exists, so the pod network is no longer open. The live test that, from the Open WebUI pod, LiteLLM and DNS are allowed while direct Ollama, arbitrary external IPs and other in-cluster services are blocked is still to run.
 - Unreachable from another LAN host: needs a second device.
 - Windows browser test: not run from this session.
 
