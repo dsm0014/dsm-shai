@@ -4,7 +4,7 @@
 
 ## Purpose
 
-A nightly Hermes job evaluates the user's `claude-specter` repository, compares it with open-source equivalents on GitHub, and turns the improvement vectors into specs. On nights when an unimplemented improvement spec already exists, it implements one instead, tests it, and opens and merges the pull request. The target is `claude-specter` only, never `dsm-shai`, so Flux is not involved and no cluster state changes through this job. Depends on spec 04 (Hermes), spec 08 (mesh and egress), spec 09 (LiteLLM) and spec 10 (secrets delivery).
+A nightly Hermes job evaluates the user's `claude-specter` repository, compares it with open-source equivalents on GitHub, and turns the improvement vectors into specs. On nights when an unimplemented improvement spec already exists, it implements one instead, tests it, and opens and merges the pull request. The target is `claude-specter` only, never `dsm-shai`, so Flux is not involved and no cluster state changes through this job. Depends on spec 04 (Hermes), spec 08 (mesh and egress), spec 09 (LiteLLM) and spec 10 (secrets delivery). The swarm (spec 13), repo work (spec 14) and the repo maintainer (spec 16) reuse this job's guards, its proxy path and its audit conventions.
 
 ## Behavior
 
