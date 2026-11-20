@@ -129,6 +129,7 @@ def json_in(text):
         return None
 
 OV_RECALL_CHARS = 1500  # most memory text a recall adds to a planner prompt
+RECALL_BOILERPLATE = (".abstract.md", ".overview.md")  # OpenViking's scope descriptions, never an outcome
 
 def ov_url():
     return os.environ.get("SWARM_OPENVIKING_MCP", "http://openviking.openviking.svc:1933/mcp")
@@ -183,23 +184,41 @@ def remember_exchange(user, assistant):
     except Exception:  # best effort by design: any failure is recorded as not remembered
         return False
 
+def _find_items(text):
+    """(uri, snippet) for each hit in a `find` reply. A hit is a line `- [kind pct] viking://...` with its snippet indented below."""
+    items, cur = [], None
+    for line in text.splitlines():
+        m = re.match(r"^- \[[^\]]*\] (viking://\S+)\s*$", line)
+        if m:
+            cur = (m.group(1), [])
+            items.append(cur)
+        elif cur is not None and line.startswith("    "):
+            cur[1].append(line.strip())
+        elif line.strip():
+            cur = None
+    return [(u, "\n".join(snip).strip()) for u, snip in items]
+
 def recall(query):
-    """Earlier memories about `query`: MCP find, then read the viking:// items it names (at most two). Returns text of at most
-    OV_RECALL_CHARS, or "" when there is no key, nothing matched, or OpenViking failed. The text is untrusted: callers wrap it."""
+    """Earlier outcomes about `query`. `find` is scoped to the memories directory (an unscoped find returns scope boilerplate).
+    Hits that are boilerplate (.abstract.md, .overview.md) or have no snippet are dropped; up to two remaining items are read.
+    Returns text of at most OV_RECALL_CHARS, or "" when there is no key, nothing matched, or OpenViking failed.
+    The text is untrusted: callers wrap it."""
     if not os.environ.get("OPENVIKING_KEY"):
         return ""
+    scope = os.environ.get("SWARM_OPENVIKING_SCOPE", "viking://user/hermes/memories/")
     try:
-        text = _text_of(openviking_call("find", {"query": query[:200]}))
+        hits = _find_items(_text_of(openviking_call("find", {"query": query[:200], "target_uri": scope, "limit": 5})))
     except Exception:
         return ""
+    keep = [(u, snip) for u, snip in hits if not u.endswith(RECALL_BOILERPLATE) and snip][:2]
     parts = []
-    for uri in list(dict.fromkeys(re.findall(r"viking://[^\s\"'<>)\]]+", text)))[:2]:
+    for uri, snip in keep:
         try:
-            parts.append(_text_of(openviking_call("read", {"uri": uri})))
+            content = _text_of(openviking_call("read", {"uri": uri})).strip()
         except Exception:
-            pass
-    parts.append(text)
-    return "\n\n".join(p.strip() for p in parts if p.strip())[:OV_RECALL_CHARS]
+            content = ""
+        parts.append(content or snip)
+    return "\n\n".join(p for p in parts if p)[:OV_RECALL_CHARS]
 
 
 class Run:
