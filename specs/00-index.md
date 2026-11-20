@@ -19,7 +19,7 @@ Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "P
 | 13 | [Hermes Swarm Orchestration](./13-hermes-swarm-orchestration.md) | DONE | Every criterion verified live 2026-11-19; the `swarm-example` cron entry is registered paused |
 | 14 | [Autonomous Repo Work via the Swarm](./14-swarm-repo-work.md) | IN PROGRESS | Built and live-verified on this repo (7 merged swarm PRs). Open: rehearsal-repo run (skipped), `make swarm-plan TASK=repo-work` and `skipped: pr open` live, `SWARM_REPO_WORK=1` flip |
 | 15 | [Hermes on Discord, Swarm Commands and Haiku Web Research](./15-hermes-discord.md) | IN PROGRESS | Egress (restricted and open-web proxy listeners) and the Haiku research mode are built and tested offline. Open: Squid check in Docker and in the cluster, research live check, the whole Discord side (secret, gateway, `quick_commands`, `swarm-chat.sh`, digest cron) |
-| 16 | [Repo Maintainer Loop](./16-repo-maintainer-loop.md) | TODO | Not started; builds on specs 11, 12, 13, 14 |
+| 16 | [Repo Maintainer Loop](./16-repo-maintainer-loop.md) | IN PROGRESS | live merge-mode run on a good swarm PR; cron resumed; branch protection check |
 
 ## Measured footprint (2026-11-16)
 
