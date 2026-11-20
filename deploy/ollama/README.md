@@ -6,7 +6,7 @@ Ollama inference (spec 02). Single replica, `Recreate`, RTX 4080 via `RuntimeCla
 
 | Role | Tag | Notes |
 |---|---|---|
-| Chat | `qwen3.5:9b` (Q4_K_M, 256K native, vision, thinking) | 64K served in 6.43 GiB; replaces `llama3.1:8b` (see "Decision: chat model" below) |
+| Chat | `ministral-3:14b` (Q4_K_M, 9.1 GB, no thinking mode) | 64K served in 11 GB at 100% GPU with `q4_0` KV cache; replaces `qwen3.5:9b` (see "Decision: Ministral 3 14B" below) |
 | Embedding | `nomic-embed-text:v1.5` | 768-dim; pinned resident |
 | VLM | `qwen2.5vl:3b` | image description verified |
 
@@ -17,6 +17,20 @@ Models live on the `ollama-models` PVC (50Gi, `local-path` on the WSL ext4 volum
 - `OLLAMA_CONTEXT_LENGTH=65536`, flash attention on, KV cache `q8_0`, `NUM_PARALLEL=1`, `MAX_LOADED_MODELS=2`, `KEEP_ALIVE=10m`.
 - `ollama-preload` Job pulls the three models and warms them. Idempotent: a re-run with models present completes in seconds with no re-download.
 - `ollama-embed-pin` CronJob (every 5 min) re-pins the embedding model with `keep_alive: -1`. Needed because `/v1/embeddings` has no keep-alive parameter, so any embedding call resets the model to the default 10m.
+
+## Decision: Ministral 3 14B (2026-11-20)
+
+**The chat model is now `ministral-3:14b`.** Benchmark (21 recorded swarm worker steps, production verifiers, first-try pass): `ministral-3:14b` 21/21 (mean 44 s), `gemma4:12b` 11/21 (48 s; empty replies and missing code blocks), `ministral-3:8b` 0 of 8 run (it never names the file), `qwen3.5:9b` 5/21 (99 s). The other candidates and the older models were deleted from the volume (about 42 GB).
+
+| Measurement (65536 context, embed resident) | Result |
+|---|---|
+| `q8_0` KV cache | 14 GB, 4% CPU / 96% GPU, device 15.3 of 16.4 GB: spills to the CPU |
+| `q4_0` KV cache (now) | 11 GB, 100% GPU, device 12.8 of 16.4 GB |
+| Idle, nothing loaded but the embedding model | about 1 GB, 0% utilization |
+
+- **No thinking mode:** `reasoning_effort` other than none is rejected (HTTP 400, "does not support thinking"). Hermes sets none.
+- **Tool calls:** Ollama 0.40.16 does not parse the model's `name[ARGS]{json}` format, on `/v1/chat/completions` or `/api/chat`: the call arrives as text. `deploy/litellm/ministral_tools.py` (LiteLLM callback) rewrites a non-streamed reply that consists only of such calls, for tools named in the request, into `tool_calls`. Hermes therefore runs with `streaming: false`. Retest after an Ollama upgrade and delete the hook if it parses natively.
+- **Capacity:** one loaded copy serves everyone one request at a time (`OLLAMA_NUM_PARALLEL=1`); more agents queue and add latency, not VRAM. `NUM_PARALLEL=2` would add roughly 2 to 3 GB of KV cache and about halve each generation's speed. LiteLLM's `max_parallel_requests: 2` rejects a third concurrent chat request.
 
 ## Decision: chat model and 64K context (2026-11-16)
 

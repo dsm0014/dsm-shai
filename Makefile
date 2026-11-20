@@ -144,6 +144,7 @@ check: ## Run every repository check (scripts/check-*.sh and check-*.py); CHECK=
 
 test: ## Run the offline tests and every repository check (no cluster needed; the repo maintainer runs this on each PR)
 	bash scripts/check-all.sh
+	python3 -I -m unittest discover -s deploy/litellm/tests -p 'test_*.py'
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh
 	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
 	sh deploy/hermes/jobs/repo-maintainer/tests/run_tests.sh

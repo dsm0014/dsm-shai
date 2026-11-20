@@ -2,9 +2,10 @@
 model_list:
   - model_name: chat
     litellm_params:
-      model: ollama_chat/qwen3.5:9b         # ollama_chat keeps tool-call support; 256K native, 64K served (see deploy/ollama/README.md).
-                                            # Was llama3.1:8b: its Ollama template forces a tool call on every turn (deploy/hermes/README.md).
-                                            # Needs thinking ON: with reasoning_effort "none" Ollama returns HTTP 500 on malformed XML tool calls.
+      model: ollama_chat/ministral-3:14b    # Ministral 3 14B (spec 02 amendment 2026-11-20): 21/21 first-try on the swarm replay, qwen3.5:9b 5/21.
+                                            # No thinking mode: a reasoning_effort other than "none" is rejected with HTTP 400, so Hermes sends none.
+                                            # Ollama 0.40.16 returns its tool calls as text (name[ARGS]{json}); ministral_tools.py (callbacks below)
+                                            # turns them into structured tool_calls for non-streaming requests. Was qwen3.5:9b, llama3.1:8b before.
       api_base: http://ollama.ollama.svc:11434
       timeout: 180                          # cold swap ~35s + 30k-token prompt ~60s + generation; also bounds an Ollama outage
       max_parallel_requests: 2              # extra concurrent chat calls get rejected (429) rather than thrash the GPU
@@ -24,6 +25,7 @@ general_settings:
   database_url: os.environ/DATABASE_URL     # DB needed for virtual keys, budgets, spend tracking
 
 litellm_settings:
+  callbacks: ministral_tools.handler        # /app/ministral_tools.py (deploy/litellm/ministral_tools.py): text tool calls -> tool_calls
   num_retries: 0                            # local models only: no silent retries
   request_timeout: 180
   drop_params: true

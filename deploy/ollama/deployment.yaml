@@ -31,7 +31,7 @@ spec:
             - name: OLLAMA_FLASH_ATTENTION
               value: "1"
             - name: OLLAMA_KV_CACHE_TYPE
-              value: q8_0
+              value: q4_0      # was q8_0 (qwen3.5:9b). Ministral 3 14B at 65536 context: 14 GB and 4% on the CPU with q8_0, 11 GB at 100% GPU with q4_0
             - name: OLLAMA_NUM_PARALLEL
               value: "1"
             - name: OLLAMA_MAX_LOADED_MODELS

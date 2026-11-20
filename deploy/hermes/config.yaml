@@ -1,15 +1,15 @@
 # Hermes config (spec 04). The ConfigMap is the source of truth: an init container copies it into
 # HERMES_HOME (/opt/data) on every start. Keep context_length equal to OLLAMA_CONTEXT_LENGTH (spec 02).
 model:
-  default: "chat"                                # LiteLLM alias -> qwen3.5:9b (alias name stays "chat": Hermes tunes prompts by model name)
+  default: "chat"                                # LiteLLM alias -> ministral-3:14b (alias name stays "chat": Hermes tunes prompts by model name)
   provider: "custom"                             # any OpenAI-compatible endpoint
   base_url: "http://litellm.litellm.svc:4000/v1" # the only model route (no direct Ollama)
   key_env: "LITELLM_HERMES_KEY"                  # env var holding the LiteLLM virtual key (hermes)
   context_length: 65536                          # = OLLAMA_CONTEXT_LENGTH; Hermes floor is 64K
-  streaming: true
+  streaming: false                               # the LiteLLM tool-call hook (ministral_tools.py) only runs on non-streamed replies
 
-# Agent behaviour. qwen3.5:9b must run with thinking ON: with reasoning_effort "none" Ollama returns HTTP 500 on
-# malformed XML tool calls (4 to 6 of 10 read_file calls). LiteLLM maps "medium" to think=true for this model.
+# Agent behaviour. ministral-3:14b has no thinking mode: any reasoning_effort except "none" is rejected with HTTP 400
+# ("does not support thinking"). (qwen3.5:9b, the previous model, needed thinking ON and "medium".)
 # The built-in memory toolset is disabled so that OpenViking is the only memory backend (spec 04).
 # Tool Search (deferred tools behind bridge tools) stays off: the bridge calls were unreliable with llama3.1:8b
 # (malformed tool_call wrappers). Not yet retested with qwen3.5:9b. Tools are sent with their real names.
@@ -18,7 +18,7 @@ tools:
     enabled: "off"
 
 agent:
-  reasoning_effort: "medium"
+  reasoning_effort: "none"
   # Hermes adopts a "coding agent" persona ("make changes through the tools, not the chat") on CLI surfaces when the
   # working directory looks like a code project (/opt/hermes has a pyproject.toml). `kubectl exec ... hermes` is such a
   # surface, so plain questions were answered with tool calls. This is not a coding workspace: turn it off.
