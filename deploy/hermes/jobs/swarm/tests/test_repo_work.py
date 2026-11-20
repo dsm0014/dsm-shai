@@ -36,7 +36,7 @@ def planner_for(files):
 
 def worker_reply(prompt):
     ids = re.findall(r"<<<UNTRUSTED_CONTENT input (\S+)", prompt)
-    return fence("# Rewritten\n\nThis content was written for %s by the swarm test worker.\n" % ", ".join(ids or ["nothing"]))
+    return fence("# Widgets\n\nThis content was written for %s by the swarm test worker.\n" % ", ".join(ids or ["nothing"]))
 
 
 def reply_for(files, worker=worker_reply):
@@ -234,7 +234,7 @@ class HappyPath(RepoWorkCase):
         self.assertEqual(labels, [["swarm"]])
 
         self.assertEqual(self.branches(), [branch])
-        self.assertIn("Rewritten", self.show(branch, "docs/a.md"))
+        self.assertIn("written for docs/a.md by the swarm test worker", self.show(branch, "docs/a.md"))
         tasklist = self.show(branch, ".specter/tasklist.md")
         self.assertNotIn("Rewrite the intro", tasklist)  # the task is removed in the same commit
         self.assertIn("- [x] Old finished item", tasklist)
@@ -406,7 +406,7 @@ class DeployLive(RepoWorkCase):
 
 class Verifiers(RepoWorkCase):
     def test_line_cap_fails_and_pushes_nothing(self):
-        big = lambda prompt: fence("\n".join("line %d" % i for i in range(10)) + "\nmentions docs/a.md")
+        big = lambda prompt: fence("# Widgets\n" + "\n".join("line %d" % i for i in range(10)) + "\nmentions docs/a.md")
         self.env.gateway.reply = reply_for(["docs/a.md"], worker=big)
         rc, out, err = self.run_repo("--run-id", "run-cap", SWARM_MAX_LINES="1")
         self.assertEqual(rc, 1, out + err)
