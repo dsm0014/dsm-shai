@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Let Hermes finish tasks on its own by splitting them across a swarm of workers: Claude Haiku (via the spec 12 wrapper) for planning, judging and hard steps, and local `qwen3.5:9b` for cheap, high-volume steps. A cron template and a working example job show how to schedule such tasks. Depends on specs 04 (Hermes), 09 (LiteLLM), 11 (nightly job patterns and guardrails) and 12 (`claude-haiku.sh` wrapper).
+Let Hermes finish tasks on its own by splitting them across a swarm of workers: Claude Haiku (via the spec 12 wrapper) for planning, judging and hard steps, and local `qwen3.5:9b` for cheap, high-volume steps. A cron template and a working example job show how to schedule such tasks. Depends on specs 04 (Hermes), 09 (LiteLLM), 11 (nightly job patterns and guardrails) and 12 (`claude-haiku.sh` wrapper). See also spec 14 (autonomous repo work) and spec 16 (repo maintainer loop), which build on this engine.
 
 ## Behavior
 
