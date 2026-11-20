@@ -1,0 +1,122 @@
+# Spec 16: the repo maintainer runs as a Kubernetes CronJob, not as a Hermes cron entry. Hermes strips GITHUB_TOKEN (and the other
+# tier-1 secrets) from the environment of cron scripts and refuses to pass them through (found 2026-11-20: the scheduled run got a
+# 401), so it could never reach GitHub from there. Here the token is in this pod's own environment and the agent's terminal never
+# sees it. The pod carries the hermes labels and ServiceAccount, so the same NetworkPolicy and mesh policy apply (egress to DNS,
+# LiteLLM, OpenViking and the proxy only). It shares the hermes-home PVC (single node, ReadWriteOnce is fine) for state and the
+# kill switches (/opt/data/ESTOP, /opt/data/maintainer/disabled).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: repo-maintainer
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: repo-maintainer
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid          # one pass at a time; the per-repo lock backs this up
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 7500    # a little over MAINT_WALL_SECONDS (7200)
+      backoffLimit: 0                # a failed pass is reported, not retried in a loop
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: hermes          # matches the hermes NetworkPolicy and mesh policy
+            app.kubernetes.io/component: repo-maintainer
+        spec:
+          restartPolicy: Never
+          serviceAccountName: hermes
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            fsGroup: 10000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: maintainer
+              image: dsm-shai/hermes:v0.23.1-1
+              imagePullPolicy: IfNotPresent
+              command: ["bash", "/opt/jobs/repo-maintainer/run.sh"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: LITELLM_HERMES_KEY
+                  valueFrom: {secretKeyRef: {name: hermes-secrets, key: litellm-key}}
+                - name: OPENVIKING_KEY
+                  valueFrom: {secretKeyRef: {name: hermes-secrets, key: openviking-key}}
+                - name: GITHUB_TOKEN
+                  valueFrom: {secretKeyRef: {name: hermes-github, key: token, optional: true}}
+                - name: CLAUDE_CODE_OAUTH_TOKEN
+                  valueFrom: {secretKeyRef: {name: hermes-claude, key: oauth-token, optional: true}}
+                - {name: CLAUDE_CONFIG_DIR, value: /opt/data/claude}
+                - {name: DISABLE_AUTOUPDATER, value: "1"}
+                - {name: CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, value: "1"}
+                - {name: HERMES_HOME, value: /opt/data}
+                - {name: HOME, value: /opt/data/home}
+                - {name: HTTPS_PROXY, value: "http://squid.egress-proxy.svc:3128"}
+                - {name: https_proxy, value: "http://squid.egress-proxy.svc:3128"}
+                - {name: NO_PROXY, value: ".svc,.cluster.local,localhost,127.0.0.1,10.42.0.0/16,10.43.0.0/16"}
+                - {name: no_proxy, value: ".svc,.cluster.local,localhost,127.0.0.1,10.42.0.0/16,10.43.0.0/16"}
+                - {name: GIT_AUTHOR_NAME, value: "Hermes (dsm-shai)"}
+                - {name: GIT_COMMITTER_NAME, value: "Hermes (dsm-shai)"}
+                - {name: GIT_AUTHOR_EMAIL, value: "hermes@dsm-shai.invalid"}
+                - {name: GIT_COMMITTER_EMAIL, value: "hermes@dsm-shai.invalid"}
+                - {name: GIT_CONFIG_COUNT, value: "1"}
+                - {name: GIT_CONFIG_KEY_0, value: "credential.https://github.com.helper"}
+                - name: GIT_CONFIG_VALUE_0
+                  value: '!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f'
+              envFrom:
+                - configMapRef: {name: maintainer-env, optional: true}
+                - configMapRef: {name: swarm-env, optional: true}
+              resources:
+                requests: {cpu: 250m, memory: 512Mi}
+                limits: {cpu: "2", memory: 3Gi}       # the fresh-clone test run needs room
+              volumeMounts:
+                - {name: home, mountPath: /opt/data}
+                - {name: workspace, mountPath: /workspace}
+                - {name: tmp, mountPath: /tmp}
+                - {name: repo-maintainer-job, mountPath: /opt/jobs/repo-maintainer, readOnly: true}
+                - {name: swarm-job, mountPath: /opt/jobs/swarm, readOnly: true}
+                - {name: claude-haiku-job, mountPath: /opt/jobs/claude-haiku, readOnly: true}
+          volumes:
+            - name: home
+              persistentVolumeClaim: {claimName: hermes-home}
+            - name: workspace
+              emptyDir: {sizeLimit: 10Gi}
+            - name: tmp
+              emptyDir: {sizeLimit: 1Gi}
+            - name: claude-haiku-job
+              configMap: {name: hermes-claude-haiku, defaultMode: 0555}
+            - name: repo-maintainer-job
+              configMap:
+                name: hermes-repo-maintainer
+                defaultMode: 0555
+                items:
+                  - {key: maintain.py, path: maintain.py}
+                  - {key: run.sh, path: run.sh}
+                  - {key: repos.yaml, path: repos.yaml}
+                  - {key: prompt-review, path: prompts/review.v1.txt}
+            - name: swarm-job
+              configMap:
+                name: hermes-swarm
+                defaultMode: 0555
+                items:
+                  - {key: swarm.py, path: swarm.py}
+                  - {key: lib.py, path: lib.py}
+                  - {key: route.py, path: route.py}
+                  - {key: verifiers.py, path: verifiers.py}
+                  - {key: workers.py, path: workers.py}
+                  - {key: repo_work.py, path: repo_work.py}
+                  - {key: pick_task.py, path: pick_task.py}
+                  - {key: run.sh, path: run.sh}
+                  - {key: prompt-plan, path: prompts/plan.v1.txt}
+                  - {key: prompt-worker, path: prompts/worker.v1.txt}

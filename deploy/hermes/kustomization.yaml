@@ -5,6 +5,7 @@ resources:
   - hermes.yaml
   - egress-networkpolicy.yaml
   - metrics-service.yaml
+  - maintainer-cronjob.yaml
 configMapGenerator:
   - name: hermes-config
     files:
@@ -56,7 +57,6 @@ configMapGenerator:
     files:
       - maintain.py=jobs/repo-maintainer/maintain.py
       - run.sh=jobs/repo-maintainer/run.sh
-      - register-cron.sh=jobs/repo-maintainer/register-cron.sh
       - repos.yaml=jobs/repo-maintainer/repos.yaml
       - prompt-review=jobs/repo-maintainer/prompts/review.v1.txt
   # Spec 16 settings. Both allowlists must name a repo (and SWARM_ALLOWED_REPOS in swarm-env) or it is refused.

@@ -216,7 +216,6 @@ spec:
             items:
               - {key: maintain.py, path: maintain.py}
               - {key: run.sh, path: run.sh}
-              - {key: register-cron.sh, path: register-cron.sh}
               - {key: repos.yaml, path: repos.yaml}
               - {key: prompt-review, path: prompts/review.v1.txt}
         - name: swarm-repo-work-job            # spec 14 autonomous repo work job (paused until SWARM_REPO_WORK=1)
