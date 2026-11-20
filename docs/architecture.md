@@ -6,7 +6,7 @@
 
 ## Purpose
 
-`dsm-shai` is a self-hosted, autonomous AI stack running locally on Windows 11 + WSL2 with a single NVIDIA RTX 4080 (16 GB). It orchestrates Ollama (inference), OpenViking (memory/knowledge database), and Hermes Agent (autonomous task execution) on a single-node k3s cluster behind an Istio service mesh. All model inference runs locally via the free-tier LiteLLM gateway; no cloud providers are used.
+`dsm-shai` is a self-hosted, autonomous AI stack running locally on Windows 11 + WSL2 with a single NVIDIA RTX 4080 (16 GB). It orchestrates Ollama (inference), OpenViking (memory), and Hermes Agent (autonomous task execution) on a single-node k3s cluster behind an Istio ambient mesh. All model inference runs locally via the free-tier LiteLLM gateway; no cloud providers are used.
 
 ---
 
@@ -31,39 +31,60 @@
 ## Architecture Diagram (Conceptual)
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │           Windows Host               │
-                    │   (i7-13700KF + RTX 4080 16 GB)     │
-                    └─────────────────────────────────────┘
-                              │
-                    ┌─────────▼───────────────────────────┐
-                    │           WSL2 (ext4)                │
-                    │         k3s cluster                   │
-                    └─────────────────────────────────────┘
-                         │  │  │  │  │  │
-        ┌────────────────┼──┼──┼──┼──┼──┤               │
-        │ namespace      │  │ ollama│monitoring│   ◄─────┘ Istio ingress gateway
-        ├────────────────┤  └──┼────┬────┘    │         │ (spec 08)
-        │  platform     │    │  │    │      │         │
-        │ (GPU plugin)  │    │  │    │      │         │
-        ├───────────────┤    │ openviking   │ ◄──┘     LiteLLM gateway
-        │     data      │    │             │ (spec 09)
-        │ (Postgres +   │    │            hermes│
-        │  SOPS age key)│    └────┬──────────┘ (agent)
-        ├───────────────┤         │            webui
-        │ monitoring    │         │ (spec 05)
-        ├───────────────┤     egress
-        │ istio-system  │         │
-        ├───────────────┤               │
-        │ litellm       │               │
-        └───────────────┘               │
-                                         │
-                    ┌────────────────────▼────────────────────┐
-                    │            External Access                │
-                    │   — GitHub, package registries           │
-                    │   — DNS for MCP/browser tools             │
-                    │   — LiteLLM egress allowlist              │
-                    └──────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                           Windows 11 Host                                   │
+│   ┌───────────────────────────────────────────────────────────────────┐   │
+│   │   i7-13700KF + RTX 4080 16 GB (NVIDIA GPU passthrough)              │   │
+│   └───────────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────────────┘
+                                │
+┌──────────────────────────────┼───────────────────────────────────────────────┐
+│                              │                                           │
+│   ┌─────────────────────────┴───────────────────────────────────────┐   │
+│   │                          WSL2 (ext4)                              │
+│   │   ┌───────────────────────────────────────────────────────────┐   │
+│   │   │                     k3s Cluster                              │
+│   │   │                     + Istio Ambient Mesh                      │
+│   │   └───────────────────────────────────────────────────────────┘   │
+│   │                                                                   │
+│   │   ┌───────────────────────────────────────────────────────────┐   │
+│   │   │   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────┐   │
+│   │   │   │   ollama    │ │ openviking  │ │ litellm     │ │hermes│   │
+│   │   │   │ (inference) │ │ (memory)    │ │ (gateway)   │ │(agent,│   │
+│   │   │   └─────────────┘ └─────────────┘ └─────────────┘ │swarm, │   │
+│   │   │                     │                     │ │maintainer)│   │
+│   │   │   ┌─────────────┐ ┌─────────────┐ ┌───────────┐ └───────┘   │
+│   │   │   │ open-webui   │ │ monitoring  │ │ flux-system│         │   │
+│   │   │   └─────────────┘ └─────────────┘ └───────────┘         │   │
+│   │   └───────────────────────────────────────────────────────────┘   │
+│   │                                                                   │
+│   │   ┌───────────────────────────────────────────────────────────┐   │
+│   │   │                                                                 │   │
+│   │   │   ┌─────────────┐                                                       │   │
+│   │   │   │ Istio Ingress Gateway                                             │   │
+│   │   │   └─────────────┘                                                       │   │
+│   │   │           │                                                                 │   │
+│   │   │   ┌───────▼───────┐ ┌───────────────────────────────────────────┐   │
+│   │   │   │ open-webui    │ │ grafana (host-local only)                     │   │
+│   │   │   └───────────────┘ └───────────────────────────────────────────┘   │
+│   │   └───────────────────────────────────────────────────────────────┘   │
+│   │                                                                   │
+│   │   ┌───────────────────────────────────────────────────────────┐   │
+│   │   │                                                                 │   │
+│   │   │   ┌─────────────┐                                                       │   │
+│   │   │   │ egress-proxy │                                                       │   │
+│   │   │   │ (Squid)     │                                                       │   │
+│   │   │   └─────────────┘                                                       │   │
+│   │   │           │                                                                 │   │
+│   │   │   ┌───────▼───────┐                                                       │   │
+│   │   │   │ External     │                                                       │   │
+│   │   │   │   ┌─────────┴─────────┐ ┌─────────────┐ ┌─────────────┐         │   │
+│   │   │   │   │ GitHub       │ │ api.anthropic.com │ │ Discord     │         │   │
+│   │   │   │   └─────────────┘ └─────────────────┘ └─────────────┘         │   │
+│   │   │   └───────────────────────────────────────────────────────────┘   │
+│   │   └───────────────────────────────────────────────────────────────┘   │
+│   └───────────────────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
