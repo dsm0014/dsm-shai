@@ -31,10 +31,9 @@ def paused():
 
 
 def prompt_text(name, **kw):
+    """Fill {{name}} placeholders in one pass, so a value that itself contains a placeholder is not filled again."""
     t = open(os.path.join(HERE, "prompts", name + ".v1.txt")).read()
-    for k, v in kw.items():
-        t = t.replace("{{%s}}" % k, str(v))
-    return t
+    return re.sub(r"\{\{(\w+)\}\}", lambda m: str(kw[m.group(1)]) if m.group(1) in kw else m.group(0), t)
 
 
 def refuse(msg):
@@ -129,6 +128,98 @@ def json_in(text):
     except ValueError:
         return None
 
+OV_RECALL_CHARS = 1500  # most memory text a recall adds to a planner prompt
+RECALL_BOILERPLATE = (".abstract.md", ".overview.md")  # OpenViking's scope descriptions, never an outcome
+
+def ov_url():
+    return os.environ.get("SWARM_OPENVIKING_MCP", "http://openviking.openviking.svc:1933/mcp")
+
+def _rpc_reply(body, rid):
+    """The JSON-RPC reply with id `rid`, from a body that is server-sent events or plain JSON."""
+    for line in body.splitlines():
+        if line.strip().startswith("data:"):
+            try:
+                msg = json.loads(line.strip()[5:])
+            except ValueError:
+                continue
+            if isinstance(msg, dict) and msg.get("id") == rid:
+                return msg
+    return json.loads(body)
+
+def openviking_call(name, arguments, timeout=30):
+    """One tool call on OpenViking's MCP endpoint (initialize, initialized, tools/call). Returns the call's result object.
+    Raises OSError or ValueError on any transport or protocol failure."""
+    url, key = ov_url(), os.environ.get("OPENVIKING_KEY", "")
+
+    def rpc(method, params, sid=None, rid=None):
+        h = {"X-API-Key": key, "Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+        if sid:
+            h["Mcp-Session-Id"] = sid
+        msg = {"jsonrpc": "2.0", "method": method, "params": params}
+        if rid is not None:
+            msg["id"] = rid
+        with urllib.request.urlopen(urllib.request.Request(url, data=json.dumps(msg).encode(), headers=h), timeout=timeout) as r:
+            return r.headers.get("Mcp-Session-Id"), r.read().decode()
+    sid, _ = rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "swarm", "version": "1"}}, rid=1)
+    rpc("notifications/initialized", {}, sid)
+    _, body = rpc("tools/call", {"name": name, "arguments": arguments}, sid, rid=2)
+    msg = _rpc_reply(body, 2)
+    if "error" in msg:
+        raise ValueError("openviking %s: JSON-RPC error" % name)
+    return msg.get("result") or {}
+
+def _text_of(result):
+    if not isinstance(result, dict) or result.get("isError"):
+        return ""
+    return "\n".join(c["text"] for c in result.get("content", []) if isinstance(c, dict) and isinstance(c.get("text"), str))
+
+def remember_exchange(user, assistant):
+    """Store one two-message exchange in OpenViking (MCP `remember`; a one-line remember extracts nothing). Returns True only when
+    the server reports no error. Never raises: OpenViking being down must not fail a run. Text is redacted and bounded first."""
+    if not os.environ.get("OPENVIKING_KEY"):
+        return False
+    msgs = [{"role": "user", "content": lib.redact(user)[:1500]}, {"role": "assistant", "content": lib.redact(assistant)[:1500]}]
+    try:
+        return openviking_call("remember", {"messages": msgs}).get("isError") is False
+    except Exception:  # best effort by design: any failure is recorded as not remembered
+        return False
+
+def _find_items(text):
+    """(uri, snippet) for each hit in a `find` reply. A hit is a line `- [kind pct] viking://...` with its snippet indented below."""
+    items, cur = [], None
+    for line in text.splitlines():
+        m = re.match(r"^- \[[^\]]*\] (viking://\S+)\s*$", line)
+        if m:
+            cur = (m.group(1), [])
+            items.append(cur)
+        elif cur is not None and line.startswith("    "):
+            cur[1].append(line.strip())
+        elif line.strip():
+            cur = None
+    return [(u, "\n".join(snip).strip()) for u, snip in items]
+
+def recall(query):
+    """Earlier outcomes about `query`. `find` is scoped to the memories directory (an unscoped find returns scope boilerplate).
+    Hits that are boilerplate (.abstract.md, .overview.md) or have no snippet are dropped; up to two remaining items are read.
+    Returns text of at most OV_RECALL_CHARS, or "" when there is no key, nothing matched, or OpenViking failed.
+    The text is untrusted: callers wrap it."""
+    if not os.environ.get("OPENVIKING_KEY"):
+        return ""
+    scope = os.environ.get("SWARM_OPENVIKING_SCOPE", "viking://user/hermes/memories/")
+    try:
+        hits = _find_items(_text_of(openviking_call("find", {"query": query[:200], "target_uri": scope, "limit": 5})))
+    except Exception:
+        return ""
+    keep = [(u, snip) for u, snip in hits if not u.endswith(RECALL_BOILERPLATE) and snip][:2]
+    parts = []
+    for uri, snip in keep:
+        try:
+            content = _text_of(openviking_call("read", {"uri": uri})).strip()
+        except Exception:
+            content = ""
+        parts.append(content or snip)
+    return "\n\n".join(p for p in parts if p)[:OV_RECALL_CHARS]
+
 
 class Run:
     def __init__(self, task, args):
@@ -182,6 +273,7 @@ class Run:
         problems = []
         for attempt in (1, 2):
             p = prompt_text("plan", goal=self.task["goal"], items=listing, max_steps=min(self.max_steps, MAX_PLAN_STEPS),
+                            history="(no memory is used for this job)",
                             problems=("Your previous plan was invalid: " + "; ".join(problems)) if problems else "")
             plan = json_in(self.call(tier, p, json_mode=True))
             problems = ["the reply was not a single JSON object; reply with only the JSON object and no other text"] if plan is None else validate_plan(plan, items, self.max_steps)
@@ -274,31 +366,8 @@ class Run:
         return "\n\n".join(self.outputs[i] for i in sinks)
 
     def remember(self, task_name, report):
-        """Store a short summary in OpenViking through its MCP endpoint. Best effort; the audit records whether it worked."""
-        url, key = os.environ.get("SWARM_OPENVIKING_MCP", "http://openviking.openviking.svc:1933/mcp"), os.environ.get("OPENVIKING_KEY", "")
-        if not key:
-            return False
-        def rpc(method, params, sid=None, rid=1):
-            h = {"X-API-Key": key, "Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
-            if sid:
-                h["Mcp-Session-Id"] = sid
-            msg = {"jsonrpc": "2.0", "method": method, "params": params}
-            if rid is not None:
-                msg["id"] = rid
-            body = json.dumps(msg).encode()
-            return urllib.request.urlopen(urllib.request.Request(url, data=body, headers=h), timeout=30)
-        try:
-            r = rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "swarm", "version": "1"}})
-            sid = r.headers.get("Mcp-Session-Id")
-            r.read()
-            rpc("notifications/initialized", {}, sid, None).read()
-            msgs = [{"role": "user", "content": "Swarm task %s run %s (%s): %s" % (task_name, self.id, lib.today(), self.task["goal"])},
-                    {"role": "assistant", "content": report[:1500]}]  # the tool takes a short two-message exchange, not a bare string
-            out = rpc("tools/call", {"name": "remember", "arguments": {"messages": msgs}}, sid, 2).read().decode().replace(" ", "")
-            return '"isError":false' in out
-        except (OSError, ValueError):
-            return False
-
+        """The swarm's record of a finished run, stored through remember_exchange. Returns True when OpenViking stored it."""
+        return remember_exchange("Swarm task %s run %s (%s): %s" % (task_name, self.id, lib.today(), self.task["goal"]), report)
 
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):

@@ -63,6 +63,16 @@ def slug(text):
     return re.sub(r"[^a-z0-9]+", "-", re.sub(r"`[^`]*`|\[[^\]]*\]", " ", text.lower())).strip("-")[:40] or "task"
 
 
+def outcome_record(run, info, status, reason, pr_url):
+    """The two messages OpenViking stores for a finished repo-work run (a one-line remember extracts nothing)."""
+    info = info or {}
+    user = "Swarm repo work run %s on task %r (files: %s), %s." % (run.id, info.get("text", "")[:160], ", ".join(info.get("files", [])) or "none", lib.today())
+    if pr_url:
+        out = "Outcome: opened pull request %s. Haiku calls %d, local calls %d." % (pr_url, run.calls["haiku"], run.calls["chat"])
+    else:
+        out = "Outcome: %s%s." % (status, ": " + reason if reason else "")
+    return user, out
+
 def static_plan(task_info):
     steps = [{"id": "f%d" % n, "title": "edit " + f, "tag": "hard" if task_info["deploy"] else "normal", "deps": [], "inputs": [f],
               "instruction": "Make the change the task asks for in this one file."} for n, f in enumerate(task_info["files"][:12], 1)]
@@ -100,7 +110,7 @@ def main(task, run, swarm, lockf, state_name):
     repo = task["repo"]
     status, reason, pr_url, info, t0 = "ok", "", "", None, time.time()
     workdir = os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "swarm-repo-work-" + run.id)
-    plan, results = {"steps": []}, []
+    plan, results, history, remembered = {"steps": []}, [], "", False
     try:
         if os.environ.get("SWARM_REPO_WORK") != "1":
             raise Refused("SWARM_REPO_WORK is not 1")
@@ -146,12 +156,14 @@ def main(task, run, swarm, lockf, state_name):
                 raise Refused("refused: %s is larger than the worker can see whole (SWARM_MAX_FILE_CHARS)" % f)
             items.append({"id": f, "text": text})
         # plan with the orchestrator, then run the steps under the swarm's caps
+        history = swarm.recall(" ".join(info["files"]))  # earlier outcomes for these files: memory, untrusted, bounded
         run.task["goal"] = "Complete this repository task by editing the listed files, one step per file: " + info["text"]
         run.task["verifiers"] = ["file_block", "keeps_size"]
         tier = "chat" if run.orch == "chat" else "haiku"
         problems = []
         for _ in (1, 2):
             p = swarm.prompt_text("plan", goal=run.task["goal"], items=workers.untrusted("input names", "\n".join("- %s" % i["id"] for i in items)),
+                                  history=workers.untrusted("earlier outcomes for these files", history) if history else "(none recorded)",
                                   max_steps=len(items), problems=("Your previous plan was invalid: " + "; ".join(problems)) if problems else "")
             plan = swarm.json_in(run.call(tier, p, json_mode=True)) or {}
             problems = swarm.validate_plan(plan, items, len(items)) or (check_plan(plan, info["files"]) if plan.get("steps") else ["no steps"])
@@ -229,8 +241,11 @@ def main(task, run, swarm, lockf, state_name):
     except swarm.Capped as e:
         status, reason = "capped", str(e)
     shutil.rmtree(workdir, ignore_errors=True)  # a failed or finished run leaves nothing behind; the branch only exists remotely after a push
+    if not run.dry and status != "skipped":  # skipped runs (open pull request, no task) are not worth a memory
+        remembered = swarm.remember_exchange(*outcome_record(run, info, status, reason, pr_url))
     entry = lib.audit({"task": state_name, "kind": "repo_work", "run_id": run.id, "status": status, "reason": reason, "dry_run": run.dry,
                        "orchestrator": run.orch, "picked": (info or {}).get("text", "")[:120], "files": (info or {}).get("files", []), "pr_url": pr_url,
+                       "remembered": remembered, "recalled": len(history),
                        "steps": run.steps, "chat_calls": run.calls["chat"], "haiku_calls": run.calls["haiku"], "bytes_in": run.bytes["in"],
                        "bytes_out": run.bytes["out"], "chat_tokens": run.chat_tokens, "seconds": int(time.time() - t0)})
     lib.digest("repo-work %s%s%s%s" % (status, " dry-run" if run.dry else "", ": " + reason if reason else "", " " + pr_url if pr_url else ""))

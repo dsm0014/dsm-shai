@@ -169,6 +169,64 @@ class FakeGitHub:
         self.server.server_close()
 
 
+class FakeOpenViking:
+    """Fake OpenViking MCP endpoint (POST /mcp) for the memory calls: initialize, notifications/initialized and tools/call, answered
+    as server-sent events. `find` answers `find_text`; `read` answers read_texts[uri]; `remember` answers isError false unless
+    remember_error is set; find_error makes find answer isError true. Every tools/call is recorded as (name, arguments) and every
+    X-API-Key header as keys."""
+
+    def __init__(self, find_text="", read_texts=None, remember_error=False, find_error=False):
+        self.find_text, self.read_texts = find_text, dict(read_texts or {})
+        self.remember_error, self.find_error = remember_error, find_error
+        self.calls, self.keys, self.lock = [], [], threading.Lock()
+        fake = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                raw = self.rfile.read(int(self.headers.get("Content-Length", 0) or 0))
+                with fake.lock:
+                    fake.keys.append(self.headers.get("X-API-Key"))
+                msg = json.loads(raw or b"{}")
+                if "id" not in msg:  # notifications get no JSON-RPC reply
+                    self.send_response(202); self.send_header("Content-Length", "0"); self.end_headers()
+                    return
+                body = b"event: message\r\ndata: " + json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": fake._result(msg)}).encode() + b"\r\n\r\n"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Mcp-Session-Id", "fake-session")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        self.server = _serve(Handler)
+        self.url = "http://127.0.0.1:%d/mcp" % self.server.server_address[1]
+
+    def _result(self, msg):
+        if msg.get("method") == "initialize":
+            return {"protocolVersion": "2025-03-26", "capabilities": {}, "serverInfo": {"name": "fake-openviking", "version": "1"}}
+        name, args = msg["params"]["name"], msg["params"].get("arguments", {})
+        with self.lock:
+            self.calls.append((name, args))
+        if name == "find":
+            return {"isError": self.find_error, "content": [{"type": "text", "text": self.find_text}]}
+        if name == "read":
+            return {"isError": False, "content": [{"type": "text", "text": self.read_texts.get(args.get("uri"), "")}]}
+        if name == "remember":
+            return {"isError": self.remember_error, "content": []}
+        return {"isError": True, "content": [{"type": "text", "text": "unknown tool"}]}
+
+    def calls_named(self, name):
+        with self.lock:
+            return [a for n, a in self.calls if n == name]
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
 PY_ASK = ("import sys, urllib.request\n"
           "req = urllib.request.Request(sys.argv[1], data=sys.stdin.buffer.read(), method='POST')\n"
           "sys.stdout.write(urllib.request.urlopen(req, timeout=20).read().decode())\n")
