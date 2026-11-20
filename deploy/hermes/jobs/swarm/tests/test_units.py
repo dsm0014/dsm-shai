@@ -274,3 +274,13 @@ class HeadingsSurvive(unittest.TestCase):
     def test_all_headings_kept_passes(self):
         new = "```file\n# Title\n\nbody one changed\n\n## Part\n\nbody two\n```"
         self.assertTrue(verifiers.v_keeps_size(new, {"orig_len": len(self.OLD), "orig_text": self.OLD, "min_keep_pct": 50})[0])
+
+
+class HeadingRenameAllowed(unittest.TestCase):
+    OLD = "# Title\n\nbody one\n\n## Part\n\nbody two\n"
+
+    def test_a_task_that_says_rename_may_change_a_heading(self):
+        new = "```file\n# Title\n\nbody one\n\n## Renamed part\n\nbody two\n```"
+        ctx = {"orig_len": len(self.OLD), "orig_text": self.OLD, "min_keep_pct": 50}
+        self.assertFalse(verifiers.v_keeps_size(new, ctx)[0])
+        self.assertTrue(verifiers.v_keeps_size(new, dict(ctx, allow_heading_change=True))[0])

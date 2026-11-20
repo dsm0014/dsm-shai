@@ -64,7 +64,7 @@ def v_keeps_size(text, ctx):
     if pct < keep:
         return (False, "returned %d%% of the file's size (need %d%%); return the WHOLE file, every unchanged line included" % (pct, keep))
     old = ctx.get("orig_text")
-    if old:  # the live review of a swarm PR caught a dropped top-level heading: every markdown heading must survive
+    if old and not ctx.get("allow_heading_change"):  # the live review of a swarm PR caught a dropped top-level heading: every markdown heading must survive
         lines = set(body.splitlines())
         lost = [l for l in old.splitlines() if _re.match(r"^#{1,6} \S", l) and l not in lines]
         if lost:
