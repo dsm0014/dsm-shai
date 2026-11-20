@@ -91,6 +91,6 @@ kubectl apply -k deploy/monitoring/gpu-exporter  # exporter
 kubectl -n istio-system port-forward svc/istio-ingressgateway 8080:80   # then open http://grafana.localhost:8080
 ```
 
-## Not yet applied through Flux
+## Applied through Flux
 
-The HelmRelease changes (`prometheusOperator.podLabels`, `retention: 15d`) and the new stages (`gpu-exporter`, `monitoring-extras`, `mesh-policies`) are on this branch. They are applied to the running cluster by hand today. Merging the branch to `main` lets Flux take over.
+The HelmRelease changes (`prometheusOperator.podLabels` and retention 15d) and the stages `gpu-exporter`, `monitoring-extras` and `mesh-policies` are on main and Flux owns them; all Flux stages report Ready.
