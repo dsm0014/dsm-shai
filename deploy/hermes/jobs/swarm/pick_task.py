@@ -21,7 +21,7 @@ def paths_in(text):
     return out
 
 
-def pick(markdown):
+def pick(markdown, skip=()):
     """Return {"line": n, "text": str, "files": [...], "deploy": bool} for the first eligible task, plus skipped reasons.
     Result: (task or None, [(line_no, reason), ...])."""
     skipped, excluded_level = [], None
@@ -42,6 +42,8 @@ def pick(markdown):
             continue
         if state != " ":
             skipped.append((n, "not unstarted")); continue
+        if body in skip:
+            continue  # refused by the caller this run (forbidden path, deploy-class, too many files)
         if excluded_level is not None:
             skipped.append((n, "excluded heading")); continue
         if "[needs-owner]" in body:
