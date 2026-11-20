@@ -46,6 +46,7 @@ Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered pau
 - [ ] [needs-owner] **Nightly and swarm cron (S):** Hermes cron scripts cannot get `GITHUB_TOKEN` (stripped by design), so the paused `swarm-repo-work` and the nightly specter entries would fail with a 401 when resumed. Move them to CronJobs like the maintainer (see `deploy/hermes/maintainer-cronjob.yaml`).
 - [ ] [needs-owner] **Close spec 12 (S, needs you):** the console check is confirmed (owner, 2026-11-19). Remaining: one `vision` request through LiteLLM with the Open WebUI key (I will not use the master key). Then set spec 12 DONE.
 - [~] **Spec 14 (autonomous repo work):** built, live-verified on this repo, cron entry registered paused. Open: flip `SWARM_REPO_WORK` to 1 in `swarm-env` when you want it unattended; check `skipped: pr open` and `make swarm-plan TASK=repo-work` live the next time a `[swarm]` task is queued; the rehearsal-repo run was skipped. Queue a task by adding `[swarm]` and a backticked file path (small files only, under 24000 characters).
+- [ ] [needs-owner] **Hermes-native replacements (M; from `docs/hermes-features-audit.md`):** replace the `register-cron.sh` generators for `swarm-example` and `swarm-template` with the documented `hermes cron create --script ... --no-agent --paused` command in `deploy/hermes/README.md`, and move the `digest.log` delivery to Hermes cron `deliver` to a chat platform once Discord (spec 15) exists. Keep the offline tests passing.
 
 ## 0b. Spec 15: Discord, swarm commands, Haiku web research
 
