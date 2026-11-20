@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Give Hermes access to Claude Haiku using the owner's Claude subscription, with no Anthropic API key and no API credits. Haiku is called through the Claude Code CLI (`claude -p`) authenticated by a long-lived subscription token (`claude setup-token`). This replaces the earlier plan of an API key behind a LiteLLM `haiku` alias: a subscription token cannot be used from a third-party gateway such as LiteLLM and the API bills separately. The file name is kept so links stay valid. Depends on specs 07 (secrets), 08 (mesh), 09 (LiteLLM) and 11 (egress proxy). Spec 13 uses the `haiku` tier defined here.
+Give Hermes access to Claude Haiku using the owner's Claude subscription, with no Anthropic API key and no API credits. Haiku is called through the Claude Code CLI (`claude -p`) authenticated by a long-lived subscription token (`claude setup-token`). This replaces the earlier plan of an API key behind a LiteLLM `haiku` alias: a subscription token cannot be used from a third-party gateway such as LiteLLM and the API bills separately. The file name is kept so links stay valid. Depends on specs 07 (secrets), 08 (mesh), 09 (LiteLLM) and 11 (egress proxy). Spec 13 uses the `haiku` tier defined here. Specs 13, 14 and 16 call Haiku through this wrapper.
 
 ## Behavior
 
