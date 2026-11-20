@@ -56,7 +56,7 @@ class Memory(unittest.TestCase):
         w.run(**self.memo(f.url))
         w.run(**self.memo(f.url))
         self.assertEqual(len(f.calls_named("remember")), 1, "the same head must not be remembered twice")
-        self.assertIn("Outcome: needs changes", self.texts(f)[1])
+        self.assertIn("Outcome: closed", self.texts(f)[1])  # a fix verdict closes the PR now
 
     def test_observe_note_is_remembered_once(self):
         f = self.fake()

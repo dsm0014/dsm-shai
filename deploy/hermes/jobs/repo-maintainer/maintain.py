@@ -477,6 +477,10 @@ def maintain_repo(settings, plan, counters):
                 fails.append(("tests", test_msg))
         verdict = review(settings, task, files, counters, key=repo + ":" + str(n) + ":" + pr["head"]["sha"]) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
         outcome = "merge" if (not fails and verdict["verdict"] == "merge") else ("close" if verdict["verdict"] == "close" or any(c in SEVERE for c, _ in fails) else "fix")
+        if outcome == "fix" and mode != "observe":
+            # The swarm cannot revise a pull request, and a PR left open blocks the queue (one open swarm PR at a time): close it, count the
+            # attempt, and let the task be retried (marked [needs-owner] after max_attempts). Live 2026-11-20: a fix verdict on PR 96 stalled the loop.
+            outcome = "close"
         key = hashlib.sha1((repo + (task["text"] if task else str(n))).encode()).hexdigest()[:12]
         entry = {"pr": n, "head": pr["head"]["sha"][:12], "gates": [c for c, _ in fails], "verdict": verdict["verdict"], "outcome": outcome, "remembered": False}
         why = "; ".join(m for _, m in fails) or "; ".join(verdict.get("concerns", []) or verdict.get("reasons", [])) or "ok"

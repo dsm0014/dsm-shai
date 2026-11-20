@@ -73,15 +73,25 @@ class MergeMode(unittest.TestCase):
         self.assertEqual(report[0]["prs"][0]["outcome"], "merge")
         self.assertEqual(w.stub.writes(), [])
 
-    def test_fix_verdict_comments_and_leaves_the_pr_open(self):
+    def test_fix_verdict_closes_the_pr_because_the_swarm_cannot_revise_it(self):
+        # Live 2026-11-20: a fix verdict left PR 96 open, the one-open-swarm-PR rule then blocked the whole queue.
         w = MaintWorld(self, mode="merge")
         w.pr(9)
         w.verdict = VERDICT_FIX
         r = w.run()
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(m for m, _, _ in w.stub.writes()), ["DELETE", "PATCH", "POST"])
+        self.assertEqual(w.stub.pull_state(REPO, 9), "closed")
+        self.assertEqual(merges(w.stub), [])
+        self.assertEqual(w.attempts() and list(w.attempts().values()), [1])
+
+    def test_a_fix_verdict_in_observe_mode_only_comments(self):
+        w = MaintWorld(self, mode="observe")
+        w.pr(9)
+        w.verdict = VERDICT_FIX
+        self.assertEqual(w.run().returncode, 0)
         self.assertEqual([m for m, _, _ in w.stub.writes()], ["POST"])
         self.assertEqual(w.stub.pull_state(REPO, 9), "open")
-        self.assertEqual(merges(w.stub), [])
 
     def test_close_verdict_closes_and_deletes_the_branch_but_never_merges(self):
         w = MaintWorld(self, mode="merge")
@@ -285,8 +295,7 @@ class MergeAndRun(unittest.TestCase):
         self.assertFalse(any("/pulls/12/merge" in p for _, p, _ in w.stub.writes("PUT")))
 
     def test_child_does_not_start_while_a_swarm_pr_is_open(self):
-        w = MaintWorld(self, mode="merge-and-run")
-        w.verdict = VERDICT_FIX
+        w = MaintWorld(self, mode="merge-and-run", repos={"max_merges_per_run": 0})  # the good PR is held, so it stays open
         w.pr(9)
         r = w.run()
         self.assertEqual(r.returncode, 0, r.stderr)
