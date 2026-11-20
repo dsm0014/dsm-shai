@@ -295,7 +295,7 @@ class TestLoadRepos(unittest.TestCase):
         for r in repos.values():
             self.assertEqual(r["mode"], "observe")
             self.assertEqual(r["max_merges_per_run"], 1)
-            self.assertEqual(r["max_merges_per_day"], 8)
+            self.assertEqual(r["max_merges_per_day"], 100)
             self.assertEqual(r["branch_prefix"], "swarm/")
             self.assertFalse(r["merge_deploy"])
 
@@ -378,3 +378,32 @@ class TestHeadingGate(GateCase):
         patch = "@@ -1,2 +1,2 @@\n-# Title\n+# Title\n text\n"
         files = [tl_file(task_line), {"filename": "docs/a.md", "status": "modified", "additions": 1, "deletions": 1, "patch": patch}]
         self.assertNotIn("structure", cats(files)[0])
+
+
+class TestMergeLimitConfig(unittest.TestCase):
+    """The daily merge limit defaults to 100 and is configurable by env (all repos) and by repos.yaml (one repo)."""
+
+    def _load(self, env, yaml_text=None):
+        import tempfile
+        old = dict(os.environ)
+        try:
+            os.environ.update(env)
+            if yaml_text is not None:
+                fh = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
+                fh.write(yaml_text); fh.close()
+                os.environ["MAINT_REPOS_FILE"] = fh.name
+            return maint.load_repos()
+        finally:
+            os.environ.clear(); os.environ.update(old)
+
+    def test_default_is_100_per_day_and_1_per_run(self):
+        r = self._load({"MAINT_REPOS": "acme/a", "MAINT_REPOS_FILE": "/nonexistent"})["acme/a"]
+        self.assertEqual((r["max_merges_per_day"], r["max_merges_per_run"]), (100, 1))
+
+    def test_env_changes_the_default_for_every_repo(self):
+        repos = self._load({"MAINT_REPOS": "acme/a,acme/b", "MAINT_REPOS_FILE": "/nonexistent", "MAINT_MAX_MERGES_PER_DAY": "250", "MAINT_MAX_MERGES_PER_RUN": "5"})
+        self.assertEqual([(r["max_merges_per_day"], r["max_merges_per_run"]) for r in repos.values()], [(250, 5), (250, 5)])
+
+    def test_repos_yaml_overrides_the_env_for_one_repo(self):
+        repos = self._load({"MAINT_MAX_MERGES_PER_DAY": "250"}, "acme/a:\n  max_merges_per_day: 7\nacme/b:\n  mode: observe\n")
+        self.assertEqual((repos["acme/a"]["max_merges_per_day"], repos["acme/b"]["max_merges_per_day"]), (7, 250))

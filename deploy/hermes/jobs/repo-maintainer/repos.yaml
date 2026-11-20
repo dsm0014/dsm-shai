@@ -6,7 +6,7 @@ dsm0014/dsm-shai:
   branch_prefix: swarm/
   reviewer: haiku
   max_merges_per_run: 1
-  max_merges_per_day: 8
+  max_merges_per_day: 100       # also settable for every repo with MAINT_MAX_MERGES_PER_DAY (ConfigMap maintainer-env)
   max_attempts: 2
   merge_deploy: false
   auto_queue: false
