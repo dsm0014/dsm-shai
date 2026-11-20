@@ -8,7 +8,6 @@ Markers: `[swarm]` = queued for the Hermes swarm (small, one named file; the rep
 
 Order matters only where a task says "after"; the swarm takes the first queued task and the maintainer merges its pull request before the next starts. Only the edited file is in backticks.
 
-- [ ] [swarm] **Cross-reference, spec 13:** in `specs/13-hermes-swarm-orchestration.md` add one sentence at the end of the Purpose paragraph: See also spec 14 (autonomous repo work) and spec 16 (repo maintainer loop), which build on this engine. Change nothing else.
 - [ ] [swarm] **Cross-reference, spec 14:** in `specs/14-swarm-repo-work.md` add one sentence at the end of the Purpose paragraph: The repo maintainer (spec 16) reviews and merges the pull requests this job opens and can start it. Change nothing else.
 - [ ] [swarm] **Cross-reference, spec 12:** in `specs/12-anthropic-litellm-key.md` add one sentence at the end of the Purpose paragraph: Specs 13, 14 and 16 call Haiku through this wrapper. Change nothing else.
 - [ ] [swarm] **Cross-reference, spec 11:** in `specs/11-nightly-specter-improvement.md` add one sentence at the end of the Purpose paragraph: The swarm (spec 13), repo work (spec 14) and the repo maintainer (spec 16) reuse this job's guards, its proxy path and its audit conventions. Change nothing else.
