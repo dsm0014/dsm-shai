@@ -1,6 +1,6 @@
 # Spec 03 — OpenViking Context Service
 
-**Status:** PARTIAL (deployed and verified: write/search, restart persistence, LiteLLM attribution; NetworkPolicy/Istio deny and MCP client check pending; see deploy/openviking/README.md)
+**Status:** DONE (deployed and verified: write and search, restart persistence, LiteLLM attribution; the Istio deny policy and the NetworkPolicy are in place since spec 08)
 
 ## Purpose
 Run OpenViking as a standalone, cluster-internal HTTP service in the k3s `openviking` namespace. It gives Hermes Agent (spec 04) persistent memory, resources, and skills through the `viking://` filesystem paradigm. All model calls go through the in-cluster LiteLLM gateway (spec 09) to Ollama (spec 02), so no cloud provider is needed.
