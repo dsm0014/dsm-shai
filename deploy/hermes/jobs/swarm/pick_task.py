@@ -21,9 +21,10 @@ def paths_in(text):
     return out
 
 
-def pick(markdown):
+def pick(markdown, reject=None):
     """Return {"line": n, "text": str, "files": [...], "deploy": bool} for the first eligible task, plus skipped reasons.
-    Result: (task or None, [(line_no, reason), ...])."""
+    `reject(files, deploy)` may return a reason string: that task is skipped and the next one is tried, so one unrunnable
+    task never blocks the queue. Result: (task or None, [(line_no, reason), ...])."""
     skipped, excluded_level = [], None
     for n, line in enumerate(markdown.splitlines(), 1):
         if line.startswith("#"):
@@ -51,5 +52,9 @@ def pick(markdown):
         files = paths_in(body)
         if not files:
             skipped.append((n, "no file list")); continue
-        return ({"line": n, "text": body, "files": files, "deploy": "[swarm-deploy]" in body}, skipped)
+        deploy = "[swarm-deploy]" in body
+        why = reject(files, deploy) if reject else None
+        if why:
+            skipped.append((n, why)); continue
+        return ({"line": n, "text": body, "files": files, "deploy": deploy}, skipped)
     return (None, skipped)

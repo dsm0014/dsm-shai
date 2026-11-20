@@ -542,11 +542,18 @@ class DeployClass(unittest.TestCase):
     """Live bug 2026-11-19: specs/08-istio-service-mesh.md was refused as deploy config because its name contains 'istio'."""
 
     def test_specs_and_docs_are_not_deploy_class_even_when_named_istio(self):
-        for p in ("specs/08-istio-service-mesh.md", "docs/egress-notes.md", ".specter/tasklist.md", "README.md"):
+        for p in ("specs/08-istio-service-mesh.md", "docs/egress-notes.md", "deploy/istio/README.md", ".specter/tasklist.md", "README.md"):
             self.assertFalse(repo_work.deploy_class(p), p)
 
+    def test_an_unrunnable_task_does_not_block_the_next(self):
+        import pick_task
+        md = "## S\n- [ ] [swarm] a `deploy/x/a.yaml` b\n- [ ] [swarm] c `docs/a.md` d\n"
+        info, skipped = pick_task.pick(md, lambda f, d: "no" if repo_work.deploy_class(f[0]) and not d else None)
+        self.assertEqual(info["files"], ["docs/a.md"])
+        self.assertEqual(skipped, [(2, "no")])
+
     def test_manifests_and_mesh_config_under_deploy_still_are(self):
-        for p in ("deploy/foo/bar.yaml", "deploy/istio/README.md", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
+        for p in ("deploy/foo/bar.yaml", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
             self.assertTrue(repo_work.deploy_class(p), p)
 
 

@@ -27,6 +27,8 @@ def deploy_class(path):
     """Manifests, mesh or egress config: allowed only for tasks marked [swarm-deploy]."""
     if not path.startswith("deploy/"):
         return False  # specs, docs and the task list are never deploy config, even when their name says "istio"
+    if path.endswith(".md"):
+        return False  # a README is documentation, whatever directory it sits in
     return path.endswith((".yaml", ".yml")) or "istio" in path or "egress" in path or "networkpolicy" in path.lower()
 
 
@@ -109,11 +111,22 @@ def main(task, run, swarm, lockf, state_name):
         if any((p.get("head") or {}).get("ref", "").startswith("swarm/") for p in pulls):
             raise Refused("skipped: pr open")
         md = api("GET", "/repos/%s/contents/%s" % (repo, TASKLIST), raw=True)
-        info, skipped = pick_task.pick(md)
+        def _reject(files, deploy):
+            if not deploy and any(deploy_class(f) for f in files):
+                return "deploy-class path needs [swarm-deploy]"
+            return None
+        rejected = []
+        def reject(files, deploy):
+            bad = [f for f in files if forbidden(f)]
+            why = ("forbidden path in task: %s" % bad[0]) if bad else _reject(files, deploy)
+            if why:
+                rejected.append(why)
+            return why
+        info, skipped = pick_task.pick(md, reject)
         for n, why in skipped:
             lib.digest("repo-work: line %d skipped (%s)" % (n, why))
         if not info:
-            raise Refused("skipped: no eligible task")
+            raise Refused(rejected[0] if rejected else "skipped: no eligible task")
         bad = [f for f in info["files"] if forbidden(f)]
         if bad:
             raise Refused("forbidden path in task: %s" % bad[0])
