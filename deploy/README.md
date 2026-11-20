@@ -9,7 +9,7 @@ Declarative manifests for the dsm-shai stack. One directory per concern; each is
 | `openviking/` | OpenViking context service | 03 |
 | `hermes/` | Hermes Agent | 04 |
 
-Later specs add `istio/`, `litellm/`, `browser/`, `open-webui/` and `monitoring/`.
+The directories now are flux, hermes, istio, litellm, monitoring, ollama, open-webui, openviking, platform and secrets; there is no browser directory (the browser pod was dropped in the spec 09 amendment).
 
 ## Bootstrap order
 
