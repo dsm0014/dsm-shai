@@ -65,7 +65,7 @@ configMapGenerator:
       - MAINT_ALLOWED_REPOS=dsm0014/dsm-shai
       - MAINT_MODE_DEFAULT=observe
       - MAINT_REVIEWER=haiku
-      # Default merge limits for every repo (repos.yaml overrides per repo). 100 a day, one per pass: a pass runs every 30 minutes.
+      # Default merge limits for every repo (repos.yaml overrides per repo). 100 a day, one per pass: a pass runs every 15 minutes.
       - MAINT_MAX_MERGES_PER_DAY=100
       - MAINT_MAX_MERGES_PER_RUN=1
   # Spec 13 settings. SWARM_ALLOWED_REPOS is the fail-closed repo allowlist (empty means every task is refused).

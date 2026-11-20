@@ -12,7 +12,7 @@ metadata:
   labels:
     app.kubernetes.io/name: repo-maintainer
 spec:
-  schedule: "*/30 * * * *"
+  schedule: "*/15 * * * *"
   concurrencyPolicy: Forbid          # one pass at a time; the per-repo lock backs this up
   startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 2

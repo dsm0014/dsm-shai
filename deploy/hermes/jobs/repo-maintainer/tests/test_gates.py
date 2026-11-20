@@ -407,3 +407,15 @@ class TestMergeLimitConfig(unittest.TestCase):
     def test_repos_yaml_overrides_the_env_for_one_repo(self):
         repos = self._load({"MAINT_MAX_MERGES_PER_DAY": "250"}, "acme/a:\n  max_merges_per_day: 7\nacme/b:\n  mode: observe\n")
         self.assertEqual((repos["acme/a"]["max_merges_per_day"], repos["acme/b"]["max_merges_per_day"]), (7, 250))
+
+
+class TestHeadingRenameAllowed(GateCase):
+    def _files(self, task_line):
+        patch = "@@ -1,3 +1,3 @@\n-## Not yet applied\n+## Applied\n text\n"
+        return [tl_file(task_line), {"filename": "docs/a.md", "status": "modified", "additions": 1, "deletions": 1, "patch": patch}]
+
+    def test_a_renamed_heading_fails_without_the_word_rename_in_the_task(self):
+        self.assertIn("structure", cats(self._files("- [ ] [swarm] Reword a section in `docs/a.md`"))[0])
+
+    def test_a_task_that_says_rename_may_rename_a_heading(self):
+        self.assertNotIn("structure", cats(self._files("- [ ] [swarm] Rename the section heading in `docs/a.md`"))[0])
