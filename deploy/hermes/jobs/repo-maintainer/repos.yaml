@@ -1,0 +1,12 @@
+# The repositories this instance looks after (spec 16). A repo must ALSO be in MAINT_ALLOWED_REPOS and SWARM_ALLOWED_REPOS
+# (ConfigMap maintainer-env / swarm-env) or it is refused. Raise a mode only in a reviewed PR.
+dsm0014/dsm-shai:
+  mode: observe                 # observe: comment only. merge: merge good swarm PRs. merge-and-run: also start the next repo-work task
+  tasklist_path: .specter/tasklist.md
+  branch_prefix: swarm/
+  reviewer: haiku
+  max_merges_per_run: 1
+  max_merges_per_day: 8
+  max_attempts: 2
+  merge_deploy: false
+  auto_queue: false

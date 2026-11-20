@@ -8,6 +8,8 @@ NIGHTLY := /opt/jobs/nightly-specter/run.sh
 STATE   := /opt/data/nightly-specter
 SWARM   := /opt/jobs/swarm/run.sh
 SWSTATE := /opt/data/swarm
+MAINT   := /opt/jobs/repo-maintainer/run.sh
+MSTATE  := /opt/data/maintainer
 # Run a command in the Hermes container. The pod prints a harmless "install out of sync" line; hide it.
 HERMES  = kubectl -n hermes exec deploy/hermes -c hermes --
 QUIET   = 2>&1 | grep -v 'install out of sync' || true
@@ -16,11 +18,12 @@ QUIET   = 2>&1 | grep -v 'install out of sync' || true
 export TASK
 export REASON
 export CONFIRM
+export REPO
 export SWARM_ORCHESTRATOR
 export SWARM_HAIKU_PARALLEL
 
 .PHONY: help start stop status verify hermes-task hermes-pause hermes-resume \
-        claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test nightly-preflight nightly-dry-run nightly-run nightly-status test
+        claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test maint-preflight maint-plan maint-run maint-status maint-stop maint-test nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## /\1\t/' | awk -F'\t' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -104,10 +107,31 @@ swarm-stop: ## Spec 13: stop the running swarm (SIGTERM; the task lock is releas
 swarm-test: ## Spec 13: offline swarm tests (fake gateway and wrapper, no cluster needed)
 	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
 
+# ---- repo maintainer (spec 16) -----------------------------------------------------------------------------------
+# REPO=<owner/name> picks one repository from the config (default: all of them). A repo not in the allowlists exits 2.
+maint-preflight: ## Spec 16: tools, state dir, token, and that every configured repo passes both allowlists
+	@$(HERMES) bash $(MAINT) --preflight $(QUIET)
+
+maint-plan: ## Spec 16 dry run: list open PRs, run every gate and the review, print verdicts; no comment, merge or close
+	@a=(); [ -z "$$REPO" ] || a=(--repo "$$REPO"); $(HERMES) bash $(MAINT) --plan "$${a[@]}" $(QUIET)
+
+maint-run: ## Spec 16: one maintainer pass now (a repo in merge mode needs CONFIRM=1); REPO=<owner/name> for one repo
+	@a=(); [ -z "$$REPO" ] || a=(--repo "$$REPO"); [ "$$CONFIRM" != "1" ] || a+=(--confirm); $(HERMES) bash $(MAINT) --manual "$${a[@]}" $(QUIET)
+
+maint-status: ## Spec 16: running or not, last audit entries, digest, metrics
+	@$(HERMES) sh -c 'pgrep -f "[m]aintain.py" >/dev/null && echo "RUNNING" || echo "not running"; echo "--- audit (last 3)"; tail -3 $(MSTATE)/audit.jsonl 2>/dev/null | cut -c1-500; echo "--- digest"; tail -6 $(MSTATE)/digest.log 2>/dev/null; echo "--- metrics"; grep -hv "^#" $(MSTATE)/metrics.prom 2>/dev/null' $(QUIET)
+
+maint-stop: ## Spec 16: stop a running maintainer pass (SIGTERM; the lock is released on exit); hermes-pause is the emergency stop
+	@$(HERMES) sh -c 'pkill -TERM -f "[m]aintain.py" && echo "stop signal sent" || echo "no maintainer running"' $(QUIET)
+
+maint-test: ## Spec 16: offline maintainer tests (fake GitHub API, gateway and wrapper; no cluster needed)
+	sh deploy/hermes/jobs/repo-maintainer/tests/run_tests.sh
+
 claude-haiku-preflight: ## Spec 12: is the Claude CLI and subscription token present in the pod (no call made)
 	@$(HERMES) bash /opt/jobs/claude-haiku/claude-haiku.sh --preflight $(QUIET)
 
 test: ## Run the offline tests (nightly job, swarm, Claude Haiku wrapper) (no cluster needed)
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh
 	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
+	sh deploy/hermes/jobs/repo-maintainer/tests/run_tests.sh
 	python3 -I -m unittest discover -s deploy/hermes/jobs/claude-haiku/tests -p 'test_*.py' -v

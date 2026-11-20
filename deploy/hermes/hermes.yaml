@@ -122,6 +122,9 @@ spec:
                 name: nightly-specter-env       # NIGHTLY_REPO and the job limits; repo is empty until configured
                 optional: true
             - configMapRef:
+                name: maintainer-env            # spec 16: MAINT_ALLOWED_REPOS and defaults (observe mode)
+                optional: true
+            - configMapRef:
                 name: swarm-env                 # spec 13: SWARM_ALLOWED_REPOS (fail closed when empty) and SWARM_HAIKU_PARALLEL
                 optional: true
           resources:
@@ -148,6 +151,7 @@ spec:
             - {name: swarm-example-job, mountPath: /opt/jobs/swarm-example, readOnly: true}
             - {name: swarm-template-job, mountPath: /opt/jobs/swarm-template, readOnly: true}
             - {name: swarm-repo-work-job, mountPath: /opt/jobs/swarm-repo-work, readOnly: true}
+            - {name: repo-maintainer-job, mountPath: /opt/jobs/repo-maintainer, readOnly: true}
         - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
@@ -205,6 +209,16 @@ spec:
               - {key: example-task, path: task.yaml}
               - {key: example-run, path: run.sh}
               - {key: example-register, path: register-cron.sh}
+        - name: repo-maintainer-job            # spec 16 repo maintainer (observe mode until a reviewed PR raises it)
+          configMap:
+            name: hermes-repo-maintainer
+            defaultMode: 0555
+            items:
+              - {key: maintain.py, path: maintain.py}
+              - {key: run.sh, path: run.sh}
+              - {key: register-cron.sh, path: register-cron.sh}
+              - {key: repos.yaml, path: repos.yaml}
+              - {key: prompt-review, path: prompts/review.v1.txt}
         - name: swarm-repo-work-job            # spec 14 autonomous repo work job (paused until SWARM_REPO_WORK=1)
           configMap:
             name: hermes-swarm

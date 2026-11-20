@@ -1,6 +1,8 @@
 # Spec 16 — Repo Maintainer Loop (Hermes job)
 
-**Status:** TODO
+**Status:** IN PROGRESS
+
+> **Amendments made while building (2026-11-19):** (1) `observe` comments once per PR head and per message (an HTML marker), so a 30 minute cron does not repeat itself. (2) Task-list PRs the maintainer opens (`auto_queue`, `[needs-owner]`) carry the label `maintainer` and are **not** merged by the maintainer; the owner merges them. (3) A manual `make maint-run` uses `--manual`, and a repository not in `observe` mode needs `--confirm` (`CONFIRM=1`); cron runs do not pass `--manual`. (4) Settings come from `repos.yaml` (mounted with the job) and `MAINT_REPOS`; the maintainer ships in `observe` mode.
 
 ## Purpose
 
@@ -22,7 +24,7 @@ Seven swarm PRs were merged and four bad runs were caught, so the gates below ar
 - Hard gates, all computed by scripts from the real diff and the API (never from PR text): every changed file is the task's named file(s) plus the task-list file; the forbidden-path list from spec 14 is untouched; file and line caps hold; the task-list change removes exactly one `[swarm]` line and nothing else; no `- [x]` line in any changed file becomes `- [ ]` (the #60 case) and no deletion exceeds the spec 14 ratios; the PR's head is up to date with the default branch (else it is rebased by a script or skipped); required checks, if any, are green; the repo's test command passes in a fresh clone of the PR head.
 - Model review: one Haiku call per PR (call-count capped by the wrapper and `max_haiku_calls`) returns schema-validated JSON `{verdict: merge|fix|close, reasons: [...], concerns: [...]}` from the task text and the diff, both wrapped as untrusted content. The verdict can only **veto**: the job merges only when every script gate passes **and** the verdict is `merge`. With `reviewer: chat` (Anthropic unreachable or capped) the local model may approve only docs and spec markdown changes under a smaller line cap; anything else is left for the owner.
 - Outcomes: `merge` (a merge commit, the same style the owner uses, then delete the branch), `fix` (comment with the concerns, leave open, count one attempt), `close` (comment and close, delete the branch). After `max_attempts` (default 2) failed attempts the task line is marked `[needs-owner]` by a script PR so the queue stops retrying it.
-- Merge limits: at most `max_merges_per_run` per repository per run (default 1) and `max_merges_per_day` (default 8); never merge while the default branch's last check run is red; never merge a PR that touches deploy-class paths unless the task carried `[swarm-deploy]` **and** the repository setting `merge_deploy` is true (default false), in which case the PR is left open with a `needs-owner` comment.
+- Merge limits: at most `max_merges_per_run` per repository per run (default 1) and `max_merges_per_day` (default 8); never merge while the default branch's last check run is red; never merge a PR that touches deploy-class paths unless the task carried `[swarm-deploy]` **and** the repository setting `merge_deploy` is true (default false), otherwise the PR is left open with a `needs-owner` comment.
 
 **Next task**
 - In `merge-and-run` mode, after the review step and only when no swarm PR is open, the job starts the spec 14 repo-work job for the same repository (same guards, same one-open-PR rule). It never edits the task list itself except through that job and the `[needs-owner]` marking above.

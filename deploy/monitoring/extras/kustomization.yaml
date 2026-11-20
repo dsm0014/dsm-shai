@@ -6,6 +6,7 @@ resources:
   - grafana-route.yaml
   - nightly-alerts.yaml
   - swarm-alerts.yaml
+  - maintainer-alerts.yaml
 configMapGenerator:
   - name: dsm-dashboard-gpu-ollama
     files:
