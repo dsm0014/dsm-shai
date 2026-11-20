@@ -61,7 +61,15 @@ def v_keeps_size(text, ctx):
     body = text[m.end():end] if m and end >= m.end() - 1 else ""
     keep = int(ctx.get("min_keep_pct", 70))
     pct = len(body) * 100 // max(1, int(orig))
-    return (pct >= keep, "returned %d%% of the file's size (need %d%%); return the WHOLE file, every unchanged line included" % (pct, keep))
+    if pct < keep:
+        return (False, "returned %d%% of the file's size (need %d%%); return the WHOLE file, every unchanged line included" % (pct, keep))
+    old = ctx.get("orig_text")
+    if old:  # the live review of a swarm PR caught a dropped top-level heading: every markdown heading must survive
+        lines = set(body.splitlines())
+        lost = [l for l in old.splitlines() if _re.match(r"^#{1,6} \S", l) and l not in lines]
+        if lost:
+            return (False, "dropped heading %r; copy every unchanged line, headings included" % lost[0][:60])
+    return (True, "")
 
 
 def v_file_block(text, ctx):

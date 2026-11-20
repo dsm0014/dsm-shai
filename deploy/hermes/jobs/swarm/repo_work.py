@@ -157,6 +157,7 @@ def main(task, run, swarm, lockf, state_name):
         for s in plan["steps"]:
             s["orig_len"] = 0 if text_of[s["inputs"][0]] == "(new file)" else len(text_of[s["inputs"][0]])
             s["min_keep_pct"] = envint("SWARM_MIN_KEEP_PCT", 70)
+            s["orig_text"] = "" if text_of[s["inputs"][0]] == "(new file)" else text_of[s["inputs"][0]]
             s["instruction"] = (s["instruction"] + "\nTask: " + info["text"] + "\nReply with the COMPLETE new content of the file in one fenced block (```file ... ```), nothing else. "
                                 "Return the WHOLE file: every line that does not need to change must be copied unchanged. Do not return only the changed part.")
         run.execute(plan, items)
