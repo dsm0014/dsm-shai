@@ -334,27 +334,42 @@ class Guards(RepoWorkCase):
             with self.subTest(path):
                 self.stub.tasklist = "# Tasks\n\n- [ ] [swarm] Edit `%s` now\n" % path
                 rc, out, err = self.run_repo("--run-id", "run-forbid")
-                self.assertEqual(rc, 2, out + err)
-                self.assertEqual(self.last()["status"], "refused")
-                self.assertTrue(self.last()["reason"].startswith("forbidden path in task"), self.last())
+                self.assertEqual(rc, 0, out + err)  # skipped, not blocking: the queue moves on (nothing else is eligible here)
+                self.assertEqual(self.last()["status"], "skipped")
+                self.assertEqual(self.last()["reason"], "skipped: no eligible task")
+                self.assertIn("forbidden path in task", self.env.digest())
                 self.assertNoWorkerCalls()
                 self.assertNothingPushed()
 
     def test_more_than_the_file_cap_is_refused(self):
         self.stub.tasklist = "# Tasks\n\n- [ ] [swarm] Edit `a/1.md` `a/2.md` `a/3.md` `a/4.md` `a/5.md` `a/6.md` `a/7.md`\n"
         rc, out, err = self.run_repo("--run-id", "run-many")
-        self.assertEqual(rc, 2, out + err)
-        self.assertIn("SWARM_MAX_FILES", self.last()["reason"])
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(self.last()["reason"], "skipped: no eligible task")
+        self.assertIn("SWARM_MAX_FILES", self.env.digest())
         self.assertNoWorkerCalls()
         self.assertNothingPushed()
 
     def test_deploy_path_without_marker_is_refused(self):
         self.stub.tasklist = "# Tasks\n\n- [ ] [swarm] Tune `deploy/foo/bar.yaml`\n"
         rc, out, err = self.run_repo("--run-id", "run-deploy-no")
-        self.assertEqual(rc, 2, out + err)
-        self.assertEqual(self.last()["reason"], "deploy-class path needs [swarm-deploy]")
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(self.last()["reason"], "skipped: no eligible task")
+        self.assertIn("deploy-class path needs [swarm-deploy]", self.env.digest())
         self.assertNoWorkerCalls()
         self.assertNothingPushed()
+
+    def test_a_refused_first_task_does_not_block_the_next_one(self):
+        # Live bug 2026-11-20: the first queued task was refused on every pass and the whole queue stood still for hours.
+        self.stub.tasklist = ("# Tasks\n\n- [ ] [swarm] Tune `deploy/foo/bar.yaml`\n- [ ] [swarm] Edit `CLAUDE.md` now\n"
+                              "- [ ] [swarm] Rewrite the intro in `docs/a.md`\n")
+        rc, out, err = self.run_repo("--run-id", "run-skip-ahead")
+        self.assertEqual(rc, 0, out + err)
+        self.assertEqual(self.last()["status"], "ok", self.last())
+        self.assertIn("docs/a.md", self.last()["files"])
+        self.assertEqual(len([r for r in self.posts() if r[1].endswith("/pulls")]), 1)
+        self.assertIn("deploy-class path needs [swarm-deploy]", self.env.digest())
+        self.assertIn("forbidden path in task", self.env.digest())
 
     def test_deploy_path_with_marker_is_accepted_in_dry_run(self):
         self.stub.tasklist = "# Tasks\n\n- [ ] [swarm-deploy] Tune `deploy/foo/bar.yaml`\n"
@@ -546,8 +561,13 @@ class DeployClass(unittest.TestCase):
             self.assertFalse(repo_work.deploy_class(p), p)
 
     def test_manifests_and_mesh_config_under_deploy_still_are(self):
-        for p in ("deploy/foo/bar.yaml", "deploy/istio/README.md", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
+        for p in ("deploy/foo/bar.yaml", "deploy/istio/policies.yaml", "deploy/hermes/egress-networkpolicy.yaml", "deploy/x/egress.txt"):
             self.assertTrue(repo_work.deploy_class(p), p)
+
+    def test_markdown_under_deploy_is_documentation_not_deploy_config(self):
+        # Live bug 2026-11-20: deploy/istio/README.md was refused on every pass.
+        for p in ("deploy/istio/README.md", "deploy/hermes/README.md", "deploy/hermes/jobs/swarm/notes.md"):
+            self.assertFalse(repo_work.deploy_class(p), p)
 
 
 class KeepsSizeVerifier(RepoWorkCase):

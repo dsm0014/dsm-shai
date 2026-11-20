@@ -25,8 +25,8 @@ def forbidden(path):
 
 def deploy_class(path):
     """Manifests, mesh or egress config: allowed only for tasks marked [swarm-deploy]."""
-    if not path.startswith("deploy/"):
-        return False  # specs, docs and the task list are never deploy config, even when their name says "istio"
+    if not path.startswith("deploy/") or path.endswith(".md"):
+        return False  # specs, docs, READMEs and the task list are never deploy config, even when their path says "istio"
     return path.endswith((".yaml", ".yml")) or "istio" in path or "egress" in path or "networkpolicy" in path.lower()
 
 
@@ -109,18 +109,24 @@ def main(task, run, swarm, lockf, state_name):
         if any((p.get("head") or {}).get("ref", "").startswith("swarm/") for p in pulls):
             raise Refused("skipped: pr open")
         md = api("GET", "/repos/%s/contents/%s" % (repo, TASKLIST), raw=True)
-        info, skipped = pick_task.pick(md)
-        for n, why in skipped:
-            lib.digest("repo-work: line %d skipped (%s)" % (n, why))
-        if not info:
+        # A task this job may never do must not block the queue: skip it (digest line) and take the next eligible one.
+        refused, info = set(), None
+        for _ in range(50):
+            info, skipped = pick_task.pick(md, skip=refused)
+            for n, why in skipped:
+                lib.digest("repo-work: line %d skipped (%s)" % (n, why))
+            if not info:
+                raise Refused("skipped: no eligible task")
+            bad = [f for f in info["files"] if forbidden(f)]
+            problem = ("forbidden path in task: %s" % bad[0] if bad else
+                       "deploy-class path needs [swarm-deploy]" if not info["deploy"] and any(deploy_class(f) for f in info["files"]) else
+                       "task names more than SWARM_MAX_FILES files" if len(info["files"]) > envint("SWARM_MAX_FILES", 6) else "")
+            if not problem:
+                break
+            lib.digest("repo-work: task at line %d skipped (%s)" % (info["line"], problem))
+            refused.add(info["text"])
+        else:
             raise Refused("skipped: no eligible task")
-        bad = [f for f in info["files"] if forbidden(f)]
-        if bad:
-            raise Refused("forbidden path in task: %s" % bad[0])
-        if not info["deploy"] and any(deploy_class(f) for f in info["files"]):
-            raise Refused("deploy-class path needs [swarm-deploy]")
-        if len(info["files"]) > envint("SWARM_MAX_FILES", 6):
-            raise Refused("task names more than SWARM_MAX_FILES files")
         if run.dry:
             plan = static_plan(info)
             print(json.dumps({"task": info, "allowed_paths": info["files"], "plan": plan}, indent=1))
