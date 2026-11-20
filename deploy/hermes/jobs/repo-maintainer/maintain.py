@@ -248,8 +248,42 @@ def parse_verdict(text):
     return {"verdict": v["verdict"], "reasons": [x[:200] for x in v.get("reasons", [])][:6], "concerns": [x[:200] for x in v.get("concerns", [])][:6]}
 
 
-def review(settings, task, files, counters):
-    """Returns a verdict dict. Any failure to get a clean verdict is `fix` (never merge)."""
+def verdicts_path():
+    return os.path.join(STATE, "verdicts.json")
+
+
+def cached_verdict(key):
+    try:
+        return json.load(open(verdicts_path())).get(key)
+    except (OSError, ValueError):
+        return None
+
+
+def cache_verdict(key, verdict):
+    try:
+        data = json.load(open(verdicts_path()))
+    except (OSError, ValueError):
+        data = {}
+    data[key] = verdict
+    for old in list(data)[:-200]:  # keep the last 200
+        del data[old]
+    os.makedirs(STATE, exist_ok=True)
+    json.dump(data, open(verdicts_path(), "w"))
+
+
+def review(settings, task, files, counters, key=None):
+    """Returns a verdict dict. One review per PR head: a model that answers differently on a second ask must not flip the outcome.
+    Any failure to get a clean verdict is `fix` (never merge) and is not cached, so a transient outage is retried."""
+    hit = cached_verdict(key) if key else None
+    if hit:
+        return hit
+    v = _review(settings, task, files, counters)
+    if key and not any("unavailable" in c or "cap reached" in c or "not a valid verdict" in c for c in v.get("concerns", [])):
+        cache_verdict(key, v)
+    return v
+
+
+def _review(settings, task, files, counters):
     diff = "\n\n".join("### %s\n%s" % (f["filename"], (f.get("patch") or "(no textual patch)")[:6000]) for f in files)[:30000]
     prompt = open(os.path.join(HERE, "prompts", "review.v1.txt")).read().replace("{{task}}", task["text"] if task else "").replace(
         "{{diff}}", workers.untrusted("pull request diff", diff))
@@ -272,8 +306,8 @@ def review(settings, task, files, counters):
 
 
 # ---- actions -----------------------------------------------------------------------------------------------------------------
-def comment_once(repo, n, sha, text, plan):
-    marker = "<!-- maintainer:%s:%s -->" % (sha[:12], hashlib.sha1(text.encode()).hexdigest()[:8])
+def comment_once(repo, n, sha, text, plan, kind="note"):
+    marker = "<!-- maintainer:%s:%s -->" % (sha[:12], kind)  # one comment per head and outcome kind, whatever the wording
     if plan:
         return False
     if any(marker in (c.get("body") or "") for c in api("GET", "/repos/%s/issues/%d/comments?per_page=100" % (repo, n))):
@@ -433,7 +467,7 @@ def maintain_repo(settings, plan, counters):
             ok_tests, test_msg = run_tests(settings, pr, os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "maint-%d" % n))
             if not ok_tests:
                 fails.append(("tests", test_msg))
-        verdict = review(settings, task, files, counters) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
+        verdict = review(settings, task, files, counters, key=repo + ":" + str(n) + ":" + pr["head"]["sha"]) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
         outcome = "merge" if (not fails and verdict["verdict"] == "merge") else ("close" if verdict["verdict"] == "close" or any(c in SEVERE for c, _ in fails) else "fix")
         key = hashlib.sha1((repo + (task["text"] if task else str(n))).encode()).hexdigest()[:12]
         entry = {"pr": n, "head": pr["head"]["sha"][:12], "gates": [c for c, _ in fails], "verdict": verdict["verdict"], "outcome": outcome}
@@ -441,7 +475,7 @@ def maintain_repo(settings, plan, counters):
         if plan or mode == "observe":
             note = "**Maintainer (%s mode):** would %s this PR. Gates: %s." % (mode, outcome, why)
             if not plan:
-                comment_once(repo, n, pr["head"]["sha"], note, plan)
+                comment_once(repo, n, pr["head"]["sha"], note, plan, kind="observe-" + outcome)
         elif outcome == "merge":
             if report["merged"] >= int(settings["max_merges_per_run"]) or today_merges + report["merged"] >= int(settings["max_merges_per_day"]):
                 entry["outcome"] = "held"; entry["note"] = "merge limit reached"
@@ -450,7 +484,7 @@ def maintain_repo(settings, plan, counters):
                 report["merged"] += 1
                 audit({"event": "merge", "repo": repo, "pr": n, "sha": sha, "haiku_calls": counters["haiku"]})
         elif outcome == "close":
-            comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** closing this PR. " + why, plan)
+            comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** closing this PR. " + why, plan, kind="close")
             close_pr(repo, n, pr["head"]["ref"])
             report["closed"] += 1
             audit({"event": "close", "repo": repo, "pr": n, "gates": entry["gates"]})
@@ -458,7 +492,7 @@ def maintain_repo(settings, plan, counters):
                 edit_tasklist_pr(settings, task["text"], lambda l: l.replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1),
                                  "maintainer/needs-owner-" + key, "maintainer: mark a failing task [needs-owner]")
         else:
-            comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan)
+            comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan, kind="fix")
             if task:
                 bump_attempt(key)
         entry["why"] = why[:300]
