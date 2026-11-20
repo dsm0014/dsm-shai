@@ -30,15 +30,15 @@ Deploy Open WebUI as the human-facing chat front end in its own `open-webui` nam
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get ns open-webui` succeeds, and the Open WebUI pod reaches `Ready`.
+- [x] `kubectl get ns open-webui` succeeds, and the Open WebUI pod reaches `Ready`. Verified 2026-11-16 (see the Open WebUI README).
 - [ ] The image tag is pinned and the manifests contain no plaintext secret values.
 - [ ] `WEBUI_SECRET_KEY` comes from a Kubernetes Secret created per the secrets approach in spec 07.
-- [ ] A PVC is `Bound` on the ext4-backed storage class. Chat history and the user account survive a pod restart.
+- [x] A PVC is `Bound` on the ext4-backed storage class. Chat history and the user account survive a pod restart. Verified 2026-11-16 (see the Open WebUI README).
 - [ ] From Windows, `http://open-webui.localhost` (or the chosen name) loads the Open WebUI login page through the Istio ingress gateway.
-- [ ] The first-user admin signup works once, and afterwards the signup route and API are rejected.
-- [ ] A chat in the UI returns a completion, via LiteLLM, from a model served by in-cluster Ollama.
-- [ ] No Ingress, HTTPRoute or VirtualService targets Ollama, OpenViking, LiteLLM or Hermes, and their Services are of type `ClusterIP`.
-- [ ] No `NodePort`, `LoadBalancer` or `hostPort` exists for Open WebUI, Ollama, OpenViking or Hermes.
+- [x] The first-user admin signup works once, and afterwards the signup route and API are rejected. Verified 2026-11-16 (see the Open WebUI README).
+- [x] A chat in the UI returns a completion, via LiteLLM, from a model served by in-cluster Ollama. Verified 2026-11-16 (see the Open WebUI README).
+- [x] No Ingress, HTTPRoute or VirtualService targets Ollama, OpenViking, LiteLLM or Hermes, and their Services are of type `ClusterIP`. Verified 2026-11-16 (see the Open WebUI README).
+- [x] No `NodePort`, `LoadBalancer` or `hostPort` exists for Open WebUI, Ollama, OpenViking or Hermes. Verified 2026-11-16 (see the Open WebUI README).
 - [ ] The service is unreachable from another LAN host, which is verified by a connection attempt to the WSL IP and Windows host IP from a second device.
 - [ ] From the Open WebUI pod, a connection to LiteLLM and a DNS lookup succeed. A connection to Ollama directly, an arbitrary external IP or other in-cluster services (for example OpenViking or Hermes) is blocked.
 - [ ] If SearXNG is enabled, a web search from the UI succeeds, and a direct Open WebUI connection to anything other than LiteLLM, DNS or SearXNG remains blocked.
