@@ -1,6 +1,6 @@
 # Specs Index
 
-Status as of 2026-11-16. "DONE" means every acceptance criterion is verified. "PARTIAL" means the stated open items remain. The open items are listed in `.specter/tasklist.md`. The closed build list and decisions log are in `.specter/archive/`.
+Status as of 2026-11-20. "DONE" means every acceptance criterion is verified. "PARTIAL" means the stated open items remain. The open items are listed in `.specter/tasklist.md`. The closed build list and decisions log are in `.specter/archive/`.
 
 | # | Spec | Status | Open items |
 |---|------|--------|-----------|
