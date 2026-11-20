@@ -1,0 +1,23 @@
+# Alerts for the Hermes repo maintainer (spec 16); metrics come from the exporter on port 9101 (see nightly-alerts.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: maintainer
+  namespace: monitoring
+spec:
+  groups:
+    - name: maintainer
+      rules:
+        - alert: MaintainerLastRunFailed
+          expr: maintainer_last_run_status == 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "The repo maintainer's last run failed"
+            description: "Check /opt/data/maintainer/digest.log and audit.jsonl (make maint-status)."
+        - alert: MaintainerStale
+          expr: (time() - maintainer_last_success_timestamp > 6 * 3600) and maintainer_last_success_timestamp > 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "The repo maintainer has not succeeded for 6 hours (it runs every 30 minutes when resumed)"

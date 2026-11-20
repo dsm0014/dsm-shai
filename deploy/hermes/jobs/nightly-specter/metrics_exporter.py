@@ -3,6 +3,7 @@ import http.server, os
 
 STATE = os.environ.get("NIGHTLY_STATE", "/opt/data/nightly-specter")
 SWARM_STATE = os.environ.get("SWARM_STATE", "/opt/data/swarm")  # spec 13 writes its own metrics.prom
+MAINT_STATE = os.environ.get("MAINT_STATE", "/opt/data/maintainer")  # spec 16
 PORT = int(os.environ.get("NIGHTLY_METRICS_PORT", "9101"))
 
 
@@ -14,7 +15,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.path != "/metrics":
             self.send_response(404); self.end_headers(); return
         body = b""
-        for d in (STATE, SWARM_STATE):
+        for d in (STATE, SWARM_STATE, MAINT_STATE):
             try:
                 body += open(os.path.join(d, "metrics.prom"), "rb").read()
             except OSError:

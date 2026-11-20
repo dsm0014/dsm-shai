@@ -213,6 +213,22 @@ Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps
 
 **New job from the template:** copy `deploy/hermes/jobs/swarm-template/` to `deploy/hermes/jobs/swarm-<name>/`, edit `task.yaml`, add its files to the `hermes-swarm` generator in `kustomization.yaml` and a volume and mount in `hermes.yaml` (same as `swarm-example`), add the repo to `SWARM_ALLOWED_REPOS`, test with `make swarm-plan TASK=swarm-<name>`, then `register-cron.sh <name>` (prints the paused `hermes cron create` command; `--apply` writes a wrapper into `/opt/data/scripts/`, which is the only place Hermes accepts a `--script` from, and runs it) and `hermes cron resume <id>` when ready.
 
+## Repo maintainer (spec 16)
+
+A Hermes job that does what the manual loop did: review the open swarm pull requests, merge the good ones, then start the next repo-work task. Job: `deploy/hermes/jobs/repo-maintainer/` (`maintain.py`, `repos.yaml`, `prompts/review.v1.txt`); it imports the swarm engine from `/opt/jobs/swarm`. **It never lets a model decide alone:** a merge needs every script gate **and** a `merge` verdict from Haiku.
+
+**Configure the repositories:** `deploy/hermes/jobs/repo-maintainer/repos.yaml` has one section per repository (`mode`, `tasklist_path`, `branch_prefix`, `reviewer`, `max_merges_per_run`, `max_merges_per_day`, `max_attempts`, `merge_deploy`, `auto_queue`); `MAINT_REPOS` (comma list) adds repositories with the defaults. A repository runs only if it is in **both** `MAINT_ALLOWED_REPOS` (ConfigMap `maintainer-env`) and `SWARM_ALLOWED_REPOS` (`swarm-env`); an unset list means nothing runs, and `MAINT_MODE=off` stops everything. To add a repository: a reviewed PR that adds it to `repos.yaml` and both allowlists.
+
+**Modes:** `observe` (the default: comments once per PR head, never merges or closes), `merge` (merges PRs that pass, closes failed ones), `merge-and-run` (also starts the next repo-work task when no swarm PR is open). Raise a mode only in a reviewed PR; a manual `make maint-run` against a repository that is not in `observe` needs `CONFIRM=1`.
+
+**Candidates:** open PRs from branches starting with `branch_prefix` (default `swarm/`), opened by the token's own account, labelled `swarm`. **Gates (from the real diff and the API):** only the task's named files plus the task list; none of the forbidden paths; file and line caps; the task-list change removes exactly one unstarted `[swarm]` line; no verified `[x]` criterion becomes `[ ]`; no cut-down file (deletions far above additions); the head is not behind; the default branch's last check run is not red; the repository's test command passes in a fresh clone of the PR head; deploy-class paths need `[swarm-deploy]` and `merge_deploy: true`. Severe failures close the PR with a comment; the rest leave a comment and count an attempt, and after `max_attempts` the task is marked `[needs-owner]` through a PR. **Limits:** one merge per repository per run and 8 per day by default; the merge call refuses if the head moved since review.
+
+**`auto_queue`** (off by default) opens a PR labelled `maintainer` that adds `[swarm]` to the first short task naming 1 to 3 existing files under the worker size cap. The maintainer never merges task-list edits it opens: you do.
+
+**Run:** `make maint-preflight`, `make maint-plan` (every gate and verdict, no write), `make maint-run [REPO=owner/name] [CONFIRM=1]`, `make maint-status`, `make maint-stop`, `make maint-test`. Cron: `register-cron.sh --apply` registers it **paused** (every 30 minutes; `MAINT_CRON`), `hermes cron resume <id>` starts it. Kill switches: `make hermes-pause`, `/opt/data/maintainer/disabled`, `/opt/data/claude-haiku/disabled`, `MAINT_MODE=off`. **Undo a merge:** `maintain.py revert owner/name <pr>` opens a revert PR (never merges it). State: `/opt/data/maintainer/` (`audit.jsonl`, `digest.log`, `metrics.prom`, `attempts.json`). Metrics `maintainer_last_success_timestamp`, `maintainer_last_run_status`, `maintainer_merges_total`, `maintainer_closed_total`.
+
+**Branch protection:** for any repository where the job runs in `merge` mode, enable branch protection on the default branch (required status checks at least), so a merge by the token still has to pass CI.
+
 ## Autonomous repo work (spec 14)
 
 The swarm can work through the target repo's task list and open pull requests. **It never merges.** Job: `deploy/hermes/jobs/swarm-repo-work/` (task `repo-work`); code: `pick_task.py` and `repo_work.py` next to the swarm engine.
