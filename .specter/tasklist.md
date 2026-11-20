@@ -8,7 +8,8 @@ Specs 01, 04 to 08 and 10 to 13 are not DONE. Most of the gap is bookkeeping (se
 
 Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered paused, resume it with `hermes cron resume 21b81355887d` when you want the nightly digest). Remaining:
 
-- [ ] [swarm] Update the spec 16 row in `specs/00-index.md`: status IN PROGRESS, open items: live merge-mode run on a good swarm PR, cron resumed, branch protection check. Change only that row.
+- [~] **Spec 16 (repo maintainer):** deployed in `observe` mode as the CronJob `repo-maintainer` (every 30 minutes, comments once per PR head, never merges). To let it merge good swarm PRs, change `mode: observe` to `merge` (or `merge-and-run`) in `deploy/hermes/jobs/repo-maintainer/repos.yaml` in a reviewed PR; enable branch protection on `main` first. Open: a live merge-mode run, the CronJob's first scheduled pass, the `[needs-owner]` path live.
+- [ ] **Nightly and swarm cron (S):** Hermes cron scripts cannot get `GITHUB_TOKEN` (stripped by design), so the paused `swarm-repo-work` and the nightly specter entries would fail with a 401 when resumed. Move them to CronJobs like the maintainer (see `deploy/hermes/maintainer-cronjob.yaml`).
 - [ ] **Close spec 12 (S, needs you):** the console check is confirmed (owner, 2026-11-19). Remaining: one `vision` request through LiteLLM with the Open WebUI key (I will not use the master key). Then set spec 12 DONE.
 - [~] **Spec 14 (autonomous repo work):** built, live-verified on this repo, cron entry registered paused. Open: flip `SWARM_REPO_WORK` to 1 in `swarm-env` when you want it unattended; check `skipped: pr open` and `make swarm-plan TASK=repo-work` live the next time a `[swarm]` task is queued; the rehearsal-repo run was skipped. Queue a task by adding `[swarm]` and a backticked file path (small files only, under 24000 characters).
 

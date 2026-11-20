@@ -23,7 +23,7 @@ export SWARM_ORCHESTRATOR
 export SWARM_HAIKU_PARALLEL
 
 .PHONY: help start stop status verify hermes-task hermes-pause hermes-resume \
-        claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test maint-preflight maint-plan maint-run maint-status maint-stop maint-test nightly-preflight nightly-dry-run nightly-run nightly-status test
+        claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test maint-preflight maint-plan maint-run maint-status maint-stop maint-suspend maint-resume maint-test nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## /\1\t/' | awk -F'\t' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -118,11 +118,19 @@ maint-plan: ## Spec 16 dry run: list open PRs, run every gate and the review, pr
 maint-run: ## Spec 16: one maintainer pass now (a repo in merge mode needs CONFIRM=1); REPO=<owner/name> for one repo
 	@a=(); [ -z "$$REPO" ] || a=(--repo "$$REPO"); [ "$$CONFIRM" != "1" ] || a+=(--confirm); $(HERMES) bash $(MAINT) --manual "$${a[@]}" $(QUIET)
 
-maint-status: ## Spec 16: running or not, last audit entries, digest, metrics
-	@$(HERMES) sh -c 'pgrep -f "[m]aintain.py" >/dev/null && echo "RUNNING" || echo "not running"; echo "--- audit (last 3)"; tail -3 $(MSTATE)/audit.jsonl 2>/dev/null | cut -c1-500; echo "--- digest"; tail -6 $(MSTATE)/digest.log 2>/dev/null; echo "--- metrics"; grep -hv "^#" $(MSTATE)/metrics.prom 2>/dev/null' $(QUIET)
+maint-status: ## Spec 16: CronJob state, running or not, last audit entries, digest, metrics
+	@echo "cronjob: $$(kubectl -n hermes get cronjob repo-maintainer -o jsonpath='{.spec.schedule} suspend={.spec.suspend} last={.status.lastScheduleTime}' 2>/dev/null || echo missing)"
+	@$(HERMES) sh -c 'pgrep -f "[m]aintain.py" >/dev/null && echo "RUNNING (manual pass)" || echo "no manual pass running"; echo "--- audit (last 3)"; tail -3 $(MSTATE)/audit.jsonl 2>/dev/null | cut -c1-500; echo "--- digest"; tail -6 $(MSTATE)/digest.log 2>/dev/null; echo "--- metrics"; grep -hv "^#" $(MSTATE)/metrics.prom 2>/dev/null' $(QUIET)
 
-maint-stop: ## Spec 16: stop a running maintainer pass (SIGTERM; the lock is released on exit); hermes-pause is the emergency stop
-	@$(HERMES) sh -c 'pkill -TERM -f "[m]aintain.py" && echo "stop signal sent" || echo "no maintainer running"' $(QUIET)
+maint-stop: ## Spec 16: stop running maintainer passes (manual and CronJob pods); hermes-pause is the emergency stop
+	@$(HERMES) sh -c 'pkill -TERM -f "[m]aintain.py" && echo "stop signal sent" || echo "no manual pass running"' $(QUIET)
+	@kubectl -n hermes delete job -l app.kubernetes.io/name=repo-maintainer --ignore-not-found 2>&1 | head -5
+
+maint-suspend: ## Spec 16: stop scheduling new maintainer passes (CronJob suspend=true)
+	@kubectl -n hermes patch cronjob repo-maintainer -p '{"spec":{"suspend":true}}'
+
+maint-resume: ## Spec 16: resume scheduling maintainer passes (CronJob suspend=false)
+	@kubectl -n hermes patch cronjob repo-maintainer -p '{"spec":{"suspend":false}}'
 
 maint-test: ## Spec 16: offline maintainer tests (fake GitHub API, gateway and wrapper; no cluster needed)
 	sh deploy/hermes/jobs/repo-maintainer/tests/run_tests.sh
