@@ -1,0 +1,50 @@
+# Spec 16 — Repo Maintainer Loop (Hermes job)
+
+**Status:** TODO
+
+## Purpose
+
+Turn the manual loop the owner has been running, "monitor new PRs, merge the good ones, then have the swarm complete the next task", into Hermes jobs that run on a schedule for a **configurable repository** (or list of repositories). One run reviews the open swarm pull requests, merges the ones that pass hard script gates and a Haiku review, closes or comments on the rest, and then hands the next eligible task to the spec 14 repo-work job. Depends on specs 11 (GitHub token and proxy), 12 (Haiku wrapper), 13 (swarm engine) and 14 (repo work, task picker).
+
+## Lessons that shape this spec (from the manual loop, 2026-11-19)
+
+Seven swarm PRs were merged and four bad runs were caught, so the gates below are not theoretical: a worker returned a README cut from about 340 lines to 38 (PR #47); a fence-parsing bug returned a 3-line file (#50); a correct-looking spec edit unticked a criterion that had been verified live and called a proxy "GitHub-only" after its allowlist had grown (#60); a task line made the picker treat a prose mention of a forbidden directory as a file to edit. Every one was caught by reading the diff. The job automates that reading with scripts first and a model second, and it never lets a model alone decide to merge.
+
+## Behavior
+
+**Configuration (nothing is hard-coded to this repository)**
+- Settings live in ConfigMap `maintainer-env` (`deploy/hermes/kustomization.yaml`) and an optional per-repo file `deploy/hermes/jobs/repo-maintainer/repos.yaml` (restricted YAML as in spec 13). Per repository: `repo` (`owner/name`), `default_branch` (default: asked from the API), `tasklist_path` (default `.specter/tasklist.md`), `test_cmd` (default `make test` when the repo has a `test:` target), `branch_prefix` (default `swarm/`), `mode`, `max_merges_per_run`, `max_merges_per_day`, `reviewer` (`haiku` or `chat`), `auto_queue` (default off). `MAINT_REPOS` in the env gives the list when no file exists.
+- A repository is eligible only if it is in **both** `MAINT_ALLOWED_REPOS` and `SWARM_ALLOWED_REPOS` (spec 13) and `MAINT_MODE` is not `off`. An unset or empty allowlist means nothing runs. Adding a repository is a reviewed PR to the ConfigMap, never a job argument.
+- `mode` per repository: `observe` (default: review and comment only, never merge or close), `merge` (merge PRs that pass every gate, close failed ones with a comment), `merge-and-run` (also starts the next repo-work task). Raising a mode is a reviewed PR.
+
+**Review of each open pull request (script gates, then the model)**
+- Candidates: open PRs whose head branch starts with `branch_prefix`, whose author is the token's own account, and which carry the label `swarm`. Anything else is listed in the digest and left alone.
+- Hard gates, all computed by scripts from the real diff and the API (never from PR text): every changed file is the task's named file(s) plus the task-list file; the forbidden-path list from spec 14 is untouched; file and line caps hold; the task-list change removes exactly one `[swarm]` line and nothing else; no `- [x]` line in any changed file becomes `- [ ]` (the #60 case) and no deletion exceeds the spec 14 ratios; the PR's head is up to date with the default branch (else it is rebased by a script or skipped); required checks, if any, are green; the repo's test command passes in a fresh clone of the PR head.
+- Model review: one Haiku call per PR (call-count capped by the wrapper and `max_haiku_calls`) returns schema-validated JSON `{verdict: merge|fix|close, reasons: [...], concerns: [...]}` from the task text and the diff, both wrapped as untrusted content. The verdict can only **veto**: the job merges only when every script gate passes **and** the verdict is `merge`. With `reviewer: chat` (Anthropic unreachable or capped) the local model may approve only docs and spec markdown changes under a smaller line cap; anything else is left for the owner.
+- Outcomes: `merge` (a merge commit, the same style the owner uses, then delete the branch), `fix` (comment with the concerns, leave open, count one attempt), `close` (comment and close, delete the branch). After `max_attempts` (default 2) failed attempts the task line is marked `[needs-owner]` by a script PR so the queue stops retrying it.
+- Merge limits: at most `max_merges_per_run` per repository per run (default 1) and `max_merges_per_day` (default 8); never merge while the default branch's last check run is red; never merge a PR that touches deploy-class paths unless the task carried `[swarm-deploy]` **and** the repository setting `merge_deploy` is true (default false), in which case the PR is left open with a `needs-owner` comment.
+
+**Next task**
+- In `merge-and-run` mode, after the review step and only when no swarm PR is open, the job starts the spec 14 repo-work job for the same repository (same guards, same one-open-PR rule). It never edits the task list itself except through that job and the `[needs-owner]` marking above.
+- `auto_queue` (default off) lets a script mark tasks `[swarm]` that satisfy the machine-checkable eligibility rules: a backticked path list, every file exists and is under the worker size cap, no excluded heading, no `[needs-owner]`, and a task text shorter than a set length. The marking is a PR, labelled `maintainer`, which the same review step may merge. With it off, the owner queues tasks by hand.
+
+**Runtime and safety**
+- Jobs: `deploy/hermes/jobs/repo-maintainer/` (`maintain.py`, `run.sh`, `register-cron.sh`, `repos.yaml.example`, prompts), reusing the swarm modules (`lib`, `workers`, `route`, caps, audit). Cron entry registered paused, schedule from `MAINT_CRON` (default every 30 minutes). `register-cron.sh` writes the wrapper under `/opt/data/scripts` (Hermes accepts only a filename there).
+- Per-repository lock; the run exits `skipped: locked` if another is live. Kill switches: `hermes pause`, `/opt/data/maintainer/disabled`, `/opt/data/claude-haiku/disabled`, `MAINT_MODE=off`. The job holds only the spec 11 token and reaches GitHub through the egress proxy; workers and the reviewer get no token and no shell.
+- Merge is a single REST call made only from the merge function after the gates; the function takes a PR number and the verified head SHA and refuses if the head moved since review. A one-command revert helper (`maintain.py revert <pr>`) opens a revert PR; it never merges it.
+- Audit: append-only JSONL `/opt/data/maintainer/audit.jsonl` (repo, PR, gate results, verdict, merge SHA, Haiku calls; no diff text or tokens), a digest line per run, and metrics `maintainer_last_success_timestamp`, `maintainer_last_run_status`, `maintainer_merges_total`, `maintainer_closed_total`, served with the existing exporter and scraped by Prometheus. A failed gate and a refused merge each produce a digest line; two consecutive failures set the alert in `deploy/monitoring/extras/`.
+- Make targets (same style as `swarm-*`, each with a `##` help line): `maint-preflight`, `maint-plan` (dry run: list candidates, run every gate, show the verdicts; no merge, no comment, no close), `maint-run REPO=<owner/name>` (a name from the config; `CONFIRM=1` for `mode: merge`), `maint-status`, `maint-stop`, `maint-test` (offline). A repository not in the allowlist exits 2 with usage.
+
+## Acceptance Criteria
+
+- [ ] Configuration: with `MAINT_REPOS` and `repos.yaml` pointing at two fixture repositories, a run handles both, each with its own settings; a repository missing from `MAINT_ALLOWED_REPOS` or `SWARM_ALLOWED_REPOS` (or either unset) is refused before any API call; no repository name appears in the code.
+- [ ] Offline tests with a fake GitHub API, fake gateway and fake wrapper cover every hard gate: foreign author, wrong branch prefix, missing label, a file outside the task, a forbidden path, over the caps, a `[x]` line turned into `[ ]`, a task-list change that removes two lines, a stale head, a failing test command, a red default branch, a deploy-class path.
+- [ ] A PR that passes every gate and gets `merge` is merged exactly once, with the verified head SHA, and its branch is deleted; the same PR with a `fix` or `close` verdict, or with any gate failing, is never merged (asserted on the fake API's request log).
+- [ ] The model cannot widen the outcome: a reviewer reply that says `merge` for a PR that fails a gate, a malformed or non-JSON reply, and a reply embedded in the PR text are all ignored or rejected, and none results in a merge.
+- [ ] `observe` mode comments only (no merge, no close); `merge` mode needs `CONFIRM=1` from the Make target; `max_merges_per_run`, `max_merges_per_day` and the red-default-branch rule stop further merges.
+- [ ] `merge-and-run` starts the spec 14 job only when no swarm PR is open, once per run, and the resulting PR is reviewed on the next run, not the same one; `auto_queue` off never edits the task list.
+- [ ] After `max_attempts` failures the task is marked `[needs-owner]` through a PR, and the picker no longer returns it.
+- [ ] Kill switches (`hermes pause`, the disabled flag, `MAINT_MODE=off`) stop a run before any API write; a second launch logs `skipped: locked`.
+- [ ] `maint-plan` against the live repository in `observe` mode lists the open PRs and their gate and verdict results with no write; a live `merge` run on a good swarm PR merges it and the digest, audit entry and metrics are written; the cron entry registers paused and `hermes cron resume` runs it at the next schedule time.
+- [ ] `git grep -E 'sk-ant-|ghp_|github_pat_' -- . ':!*.md'` is clean; no token appears in a log, audit file, comment, PR body or ConfigMap.
+- [ ] `deploy/hermes/README.md` documents the settings, modes, gates, how to add a repository, the kill switches, the revert helper and the recommendation to enable branch protection on the default branch for any repository where the job runs in `merge` mode.
