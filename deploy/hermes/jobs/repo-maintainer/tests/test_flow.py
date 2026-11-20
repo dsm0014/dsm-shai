@@ -413,3 +413,31 @@ class AutoQueue(unittest.TestCase):
         w, r = self._run({"mode": "observe", "auto_queue": True}, mode="observe")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(wrote(w.stub, "POST"), [])
+
+
+class VerdictCache(unittest.TestCase):
+    """Live 2026-11-20: Haiku said merge, then fix, then fix with different wording, producing three different outcomes and comments
+    for one PR head. One review per head; one comment per head and outcome kind."""
+
+    def test_a_second_pass_reuses_the_verdict_and_posts_no_second_comment(self):
+        w = MaintWorld(self, mode="observe")
+        w.pr(9)
+        w.verdict = VERDICT_MERGE
+        self.assertEqual(w.run().returncode, 0)
+        first = len(wrote(w.stub, "POST"))
+        w.verdict = VERDICT_CLOSE  # a reviewer that now disagrees must not change the outcome for the same head
+        r = w.run()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(len(wrote(w.stub, "POST")), first, "second pass posted another comment")
+        pr = [p for run in w.runs() for p in run["prs"]][-1]
+        self.assertEqual(pr["verdict"], "merge")
+
+    def test_a_reviewer_outage_is_not_cached(self):
+        w = MaintWorld(self, mode="observe")
+        w.pr(9)
+        w.verdict = "not json at all"
+        self.assertEqual(w.run().returncode, 0)
+        w.verdict = VERDICT_MERGE
+        self.assertEqual(w.run().returncode, 0)
+        verdicts = [p["verdict"] for run in w.runs() for p in run["prs"]]
+        self.assertEqual(verdicts, ["fix", "merge"])  # the invalid reply was not cached, so the next pass asked again
