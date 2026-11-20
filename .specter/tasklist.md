@@ -39,7 +39,6 @@ The checks run through the check target and as part of make test, so the repo ma
 
 Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered paused, resume it with `hermes cron resume 21b81355887d` when you want the nightly digest). Remaining:
 
-- [~] **Chat model swap to `ministral-3:14b` (spec 02 amendment, owner decision 2026-11-20):** config, hook, spec and README are in this PR; rollout and live checks follow (tool call through LiteLLM with the hermes key, a Hermes task, a swarm run), then `qwen3.5:9b` is removed from the volume.
 - [ ] [needs-owner] **Ministral tool calls (S):** after an Ollama upgrade, test whether `ministral-3:14b` returns structured tool calls on its own; if so delete `deploy/litellm/ministral_tools.py` and its config lines and set Hermes `streaming` back to true.
 - [ ] [needs-owner] **Hermes tool-use score on Ministral (S):** run the Hermes replay (`scripts/bench-hermes-tools.py`) against `ministral-3:14b` and record it next to the earlier qwen3.5:9b score in `deploy/hermes/README.md`.
 - [~] **Spec 16 (repo maintainer):** deployed in `observe` mode as the CronJob `repo-maintainer` (every 30 minutes, comments once per PR head, never merges). To let it merge good swarm PRs, change `mode: observe` to `merge` (or `merge-and-run`) in `deploy/hermes/jobs/repo-maintainer/repos.yaml` in a reviewed PR; enable branch protection on `main` first. Open: a live merge-mode run, the CronJob's first scheduled pass, the `[needs-owner]` path live.
