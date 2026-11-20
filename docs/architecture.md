@@ -77,7 +77,7 @@ Prepares the Windows 11 + WSL2 host and single-node k3s cluster with:
 - GPU passthrough via NVIDIA driver (610.x, CUDA 13.x)
 - k3s with containerd, NVIDIA runtime (`nvidia-ctk`), device plugin advertising 1 GPU
 - `local-path` StorageClass on WSL ext4 volume (not `/mnt/c`)
-- Namespaces: `ollama`, `openviking`, `hermes`, plus later `monitoring`, `istio-system`, `litellm`, `browser`, `open-webui`
+- Namespaces: `ollama`, `openviking`, `hermes`, plus later `monitoring`, `istio-system`, `litellm`, `open-webui`
 - Helm/Kustomize manifests under `deploy/` for declarative, ordered rollout
 
 ### Ollama Inference (Spec 02)
@@ -112,7 +112,7 @@ Runs in namespace `hermes`, using the NousResearch/hermes-agent image:
 - ConfigMap delivers config.yaml with LiteLLM endpoint, model alias, context length
 - Storage: PVC for `~/.hermes` (sessions, skills) and bounded workspace volume
 - Safety boundaries: no cluster credentials, dropped capabilities, resource limits
-- Egress restricted to LiteLLM, OpenViking, DNS, and an explicit web allowlist
+- Egress restricted to LiteLLM, OpenViking, DNS, and the Squid egress proxy (GitHub, Anthropic and Discord hosts)
 - Interactive (`kubectl exec -it`) and headless modes
 
 ### LiteLLM Gateway (Spec 09)
@@ -135,7 +135,7 @@ Ambient mode, single ingress gateway:
 
 - mTLS (STRICT), AuthorizationPolicies, default-deny NetworkPolicy, `REGISTRY_ONLY` egress
 - Ingress gateway exposes the platform to external clients
-- Egress allowlist controlled via ServiceEntries (GitHub, registries only)
+- Egress allowlist enforced by the Squid proxy because `REGISTRY_ONLY` does not block unregistered hosts in ambient mode
 
 ### Observability (Spec 06)
 
@@ -217,11 +217,11 @@ Chat and VLM swap to stay within the 15 GB hard limit.
 | 01 Platform Foundation           | IN PROGRESS | wsl restart test; deploy/README order     |
 | 02 Ollama Inference              | DONE      | Amended: qwen3.5:9b, 64K context          |
 | 03 OpenViking Context            | PARTIAL   | MCP client check pending                   |
-| 04 Hermes Agent                  | PARTIAL   | Browser/LLM MCP, egress allowlist pending  |
+| 04 Hermes Agent                  | PARTIAL   | Browser and LLM MCP out of scope (decided); acceptance boxes to tick |
 | 05 Web UI Ingress                | PARTIAL   | Windows/LAN reachability checks            |
 | 06 Observability                 | PARTIAL   | Mesh metrics; LAN checks                   |
 | 07 Secrets Management            | PARTIAL   | Live/fresh-cluster restore; prune          |
-| 08 Istio Service Mesh            | PARTIAL   | Egress allowlist; Grafana + mesh metrics   |
+| 08 Istio Service Mesh            | PARTIAL   | Mesh metrics and Grafana dashboard (egress is the Squid proxy) |
 | 09 LiteLLM Gateway               | PARTIAL   | MCP registration, consumer integrations    |
 | 10 GitOps with Flux              | IN PROGRESS | Secret scan; suspend/resume tests         |
 | 11 Nightly Specter Improvement   | PARTIAL   | Built/merged; cron entry; go-live          |
