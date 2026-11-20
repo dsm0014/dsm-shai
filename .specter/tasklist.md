@@ -39,6 +39,9 @@ The checks run through the check target and as part of make test, so the repo ma
 
 Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered paused, resume it with `hermes cron resume 21b81355887d` when you want the nightly digest). Remaining:
 
+- [~] **Chat model swap to `ministral-3:14b` (spec 02 amendment, owner decision 2026-11-20):** config, hook, spec and README are in this PR; rollout and live checks follow (tool call through LiteLLM with the hermes key, a Hermes task, a swarm run), then `qwen3.5:9b` is removed from the volume.
+- [ ] [needs-owner] **Ministral tool calls (S):** after an Ollama upgrade, test whether `ministral-3:14b` returns structured tool calls on its own; if so delete `deploy/litellm/ministral_tools.py` and its config lines and set Hermes `streaming` back to true.
+- [ ] [needs-owner] **Hermes tool-use score on Ministral (S):** run the Hermes replay (`scripts/bench-hermes-tools.py`) against `ministral-3:14b` and record it next to the earlier qwen3.5:9b score in `deploy/hermes/README.md`.
 - [~] **Spec 16 (repo maintainer):** deployed in `observe` mode as the CronJob `repo-maintainer` (every 30 minutes, comments once per PR head, never merges). To let it merge good swarm PRs, change `mode: observe` to `merge` (or `merge-and-run`) in `deploy/hermes/jobs/repo-maintainer/repos.yaml` in a reviewed PR; enable branch protection on `main` first. Open: a live merge-mode run, the CronJob's first scheduled pass, the `[needs-owner]` path live.
 - [ ] [needs-owner] **Nightly and swarm cron (S):** Hermes cron scripts cannot get `GITHUB_TOKEN` (stripped by design), so the paused `swarm-repo-work` and the nightly specter entries would fail with a 401 when resumed. Move them to CronJobs like the maintainer (see `deploy/hermes/maintainer-cronjob.yaml`).
 - [ ] [needs-owner] **Close spec 12 (S, needs you):** the console check is confirmed (owner, 2026-11-19). Remaining: one `vision` request through LiteLLM with the Open WebUI key (I will not use the master key). Then set spec 12 DONE.
@@ -77,7 +80,6 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 
 - [ ] [needs-owner] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
 - [ ] [needs-owner] Trim `docs/architecture.md` to a real one-pager: fix the garbled diagram and the host RAM row (WSL exposes about 15 GB by default, not 24 GB).
-- [ ] [needs-owner] Benchmark `gemma4:12b` and `ministral-3:8b` with `scripts/bench-hermes-tools.py` (not on the PVC now; pull first).
 - [ ] [needs-owner] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 
 ## 7. Proposed, not decided

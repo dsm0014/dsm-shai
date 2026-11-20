@@ -75,3 +75,8 @@ Hermes does **not** use this route yet. Routed through the gateway, the OpenViki
 ## Egress policy (spec 12 follow-up)
 
 `egress-networkpolicy.yaml` limits LiteLLM to DNS, Ollama (11434), its Postgres (5432) and the ambient HBONE tunnel (15008). Postgres may reach DNS and HBONE only. LiteLLM has no route to the public internet, so no cloud provider can be configured in it by accident. To test it, make a real HTTPS request from the pod; a plain TCP connect always succeeds in ambient mode (the redirect to ztunnel accepts it), so it proves nothing.
+
+
+## Ministral tool-call hook (2026-11-20)
+
+`ministral_tools.py` is mounted at `/app/ministral_tools.py` and loaded with `litellm_settings.callbacks: ministral_tools.handler`. Ollama 0.40.16 returns Ministral 3's tool calls as text (`name[ARGS]{json}`); the hook rewrites a non-streamed reply that is only such calls, for tools named in the request, into structured `tool_calls` and sets `finish_reason: tool_calls`. It never raises and leaves everything else alone. It does not run on streamed replies, so Hermes uses `streaming: false`. Tests: `make test` (`deploy/litellm/tests`). Remove it when Ollama parses the format natively.

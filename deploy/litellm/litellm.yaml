@@ -67,6 +67,10 @@ spec:
               mountPath: /app/config.yaml
               subPath: config.yaml
               readOnly: true
+            - name: config
+              mountPath: /app/ministral_tools.py
+              subPath: ministral_tools.py
+              readOnly: true
       volumes:
         - name: config
           configMap:

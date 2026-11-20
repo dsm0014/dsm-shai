@@ -9,3 +9,4 @@ configMapGenerator:
   - name: litellm-config
     files:
       - config.yaml
+      - ministral_tools.py
