@@ -4,7 +4,7 @@ Exit codes: 0 ok or skipped, 1 failed, 2 refused or usage. A model can only veto
 import fcntl, hashlib, json, os, re, shutil, subprocess, sys, time, urllib.error, urllib.request
 SWARM_DIR = os.environ.get("SWARM_DIR", "/opt/jobs/swarm")
 sys.path.insert(0, SWARM_DIR)
-import lib, pick_task, repo_work, workers
+import lib, pick_task, repo_work, swarm, workers
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.environ.get("MAINT_STATE", "/opt/data/maintainer")
@@ -308,6 +308,12 @@ def _review(settings, task, files, counters):
 
 
 # ---- actions -----------------------------------------------------------------------------------------------------------------
+def remember_outcome(repo, n, task_text, outcome, why):
+    """A short OpenViking record of one maintainer outcome (spec 16 memory). Best effort; returns True when it was stored."""
+    where = "pull request #%d" % n if n else "the maintainer run"
+    user = "Repo maintainer on %s, %s, task %r, %s." % (repo, where, (task_text or "none")[:160], lib.today())
+    return swarm.remember_exchange(user, "Outcome: %s. %s" % (outcome, why[:600]))
+
 def comment_once(repo, n, sha, text, plan, kind="note"):
     marker = "<!-- maintainer:%s:%s -->" % (sha[:12], kind)  # one comment per head and outcome kind, whatever the wording
     if plan:
@@ -472,29 +478,33 @@ def maintain_repo(settings, plan, counters):
         verdict = review(settings, task, files, counters, key=repo + ":" + str(n) + ":" + pr["head"]["sha"]) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
         outcome = "merge" if (not fails and verdict["verdict"] == "merge") else ("close" if verdict["verdict"] == "close" or any(c in SEVERE for c, _ in fails) else "fix")
         key = hashlib.sha1((repo + (task["text"] if task else str(n))).encode()).hexdigest()[:12]
-        entry = {"pr": n, "head": pr["head"]["sha"][:12], "gates": [c for c, _ in fails], "verdict": verdict["verdict"], "outcome": outcome}
+        entry = {"pr": n, "head": pr["head"]["sha"][:12], "gates": [c for c, _ in fails], "verdict": verdict["verdict"], "outcome": outcome, "remembered": False}
         why = "; ".join(m for _, m in fails) or "; ".join(verdict.get("concerns", []) or verdict.get("reasons", [])) or "ok"
+        task_text = task["text"] if task else ""
         if plan or mode == "observe":
             note = "**Maintainer (%s mode):** would %s this PR. Gates: %s." % (mode, outcome, why)
-            if not plan:
-                comment_once(repo, n, pr["head"]["sha"], note, plan, kind="observe-" + outcome)
+            if not plan and comment_once(repo, n, pr["head"]["sha"], note, plan, kind="observe-" + outcome):
+                entry["remembered"] = remember_outcome(repo, n, task_text, "nothing done (observe mode): would " + outcome, why)
         elif outcome == "merge":
             if report["merged"] >= int(settings["max_merges_per_run"]) or today_merges + report["merged"] >= int(settings["max_merges_per_day"]):
                 entry["outcome"] = "held"; entry["note"] = "merge limit reached"
             else:
                 sha = merge_pr(repo, n, pr["head"]["sha"])
                 report["merged"] += 1
-                audit({"event": "merge", "repo": repo, "pr": n, "sha": sha, "haiku_calls": counters["haiku"]})
+                entry["remembered"] = remember_outcome(repo, n, task_text, "merged", "merge commit %s; gates passed and the reviewer said merge." % sha[:12])
+                audit({"event": "merge", "repo": repo, "pr": n, "sha": sha, "haiku_calls": counters["haiku"], "remembered": entry["remembered"]})
         elif outcome == "close":
             comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** closing this PR. " + why, plan, kind="close")
             close_pr(repo, n, pr["head"]["ref"])
             report["closed"] += 1
-            audit({"event": "close", "repo": repo, "pr": n, "gates": entry["gates"]})
+            entry["remembered"] = remember_outcome(repo, n, task_text, "closed", why)
+            audit({"event": "close", "repo": repo, "pr": n, "gates": entry["gates"], "remembered": entry["remembered"]})
             if task and bump_attempt(key) >= int(settings["max_attempts"]):
                 edit_tasklist_pr(settings, task["text"], lambda l: l.replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1),
                                  "maintainer/needs-owner-" + key, "maintainer: mark a failing task [needs-owner]")
         else:
-            comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan, kind="fix")
+            if comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan, kind="fix"):
+                entry["remembered"] = remember_outcome(repo, n, task_text, "needs changes", why)
             if task:
                 bump_attempt(key)
         entry["why"] = why[:300]
@@ -568,6 +578,8 @@ def main(argv):
         except (Refused, urllib.error.URLError, OSError, KeyError, ValueError) as e:
             audit({"event": "run", "status": "failed", "plan": plan, "repo": repo, "reason": lib.redact("%s: %s" % (type(e).__name__, e))[:200]})
             digest("%s failed: %s: %s" % (repo, type(e).__name__, e)); rc = max(rc, 1)
+            if not plan:
+                remember_outcome(repo, None, "", "failed", lib.redact("%s: %s" % (type(e).__name__, e))[:200])
     write_metrics()
     if plan:
         print(json.dumps(results, indent=1))
