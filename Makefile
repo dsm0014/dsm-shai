@@ -19,10 +19,11 @@ export TASK
 export REASON
 export CONFIRM
 export REPO
+export CHECK
 export SWARM_ORCHESTRATOR
 export SWARM_HAIKU_PARALLEL
 
-.PHONY: help start stop status verify hermes-task hermes-pause hermes-resume \
+.PHONY: check help start stop status verify hermes-task hermes-pause hermes-resume \
         claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test maint-preflight maint-plan maint-run maint-status maint-stop maint-suspend maint-resume maint-test nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
@@ -138,7 +139,11 @@ maint-test: ## Spec 16: offline maintainer tests (fake GitHub API, gateway and w
 claude-haiku-preflight: ## Spec 12: is the Claude CLI and subscription token present in the pod (no call made)
 	@$(HERMES) bash /opt/jobs/claude-haiku/claude-haiku.sh --preflight $(QUIET)
 
-test: ## Run the offline tests (nightly job, swarm, Claude Haiku wrapper) (no cluster needed)
+check: ## Run every repository check (scripts/check-*.sh and check-*.py); CHECK=<name fragment> runs a subset
+	@bash scripts/check-all.sh $$CHECK
+
+test: ## Run the offline tests and every repository check (no cluster needed; the repo maintainer runs this on each PR)
+	bash scripts/check-all.sh
 	sh deploy/hermes/jobs/nightly-specter/tests/run_tests.sh
 	sh deploy/hermes/jobs/swarm/tests/run_tests.sh
 	sh deploy/hermes/jobs/repo-maintainer/tests/run_tests.sh
