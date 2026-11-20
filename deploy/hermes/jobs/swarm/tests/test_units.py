@@ -260,3 +260,17 @@ class CitesInputs(unittest.TestCase):
     def test_basename_counts_as_a_citation(self):
         self.assertTrue(verifiers.v_cites_inputs("Changed mod.py to add a flag.", {"input_ids": ["src/pkg/mod.py"]})[0])
         self.assertFalse(verifiers.v_cites_inputs("Changed something.", {"input_ids": ["src/pkg/mod.py"]})[0])
+
+
+class HeadingsSurvive(unittest.TestCase):
+    OLD = "# Title\n\nbody one\n\n## Part\n\nbody two\n"
+
+    def test_dropped_top_heading_fails_the_step(self):
+        new = "```file\n\nbody one\n\n## Part\n\nbody two\n```"
+        ok, why = verifiers.v_keeps_size(new, {"orig_len": len(self.OLD), "orig_text": self.OLD, "min_keep_pct": 50})
+        self.assertFalse(ok)
+        self.assertIn("dropped heading", why)
+
+    def test_all_headings_kept_passes(self):
+        new = "```file\n# Title\n\nbody one changed\n\n## Part\n\nbody two\n```"
+        self.assertTrue(verifiers.v_keeps_size(new, {"orig_len": len(self.OLD), "orig_text": self.OLD, "min_keep_pct": 50})[0])

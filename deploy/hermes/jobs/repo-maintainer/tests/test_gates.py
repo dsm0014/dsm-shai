@@ -364,3 +364,17 @@ class TestCheckRepo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHeadingGate(GateCase):
+    def test_a_removed_heading_is_a_structure_failure(self):
+        task_line = "- [ ] [swarm] Update the row in `docs/a.md`"
+        patch = "@@ -1,3 +1,2 @@\n-# Title\n \n text\n"
+        files = [tl_file(task_line), {"filename": "docs/a.md", "status": "modified", "additions": 0, "deletions": 1, "patch": patch}]
+        self.assertIn("structure", cats(files)[0])
+
+    def test_a_reworded_heading_that_is_re_added_passes(self):
+        task_line = "- [ ] [swarm] Update the row in `docs/a.md`"
+        patch = "@@ -1,2 +1,2 @@\n-# Title\n+# Title\n text\n"
+        files = [tl_file(task_line), {"filename": "docs/a.md", "status": "modified", "additions": 1, "deletions": 1, "patch": patch}]
+        self.assertNotIn("structure", cats(files)[0])

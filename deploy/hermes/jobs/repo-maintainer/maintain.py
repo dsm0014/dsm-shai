@@ -192,6 +192,12 @@ def gates(settings, pr, files, default_red):
         fails.append(("caps", "over the file or line cap (%d files, %d lines)" % (len(files), adds + dels)))
     if dels > 10 + 2 * adds:
         fails.append(("deletion", "deletes %d lines while adding %d (a cut-down file)" % (dels, adds)))
+    for f in files:  # a removed markdown heading is lost structure, even in a +1/-2 change (the first live review caught one)
+        if f["filename"].endswith(".md") and f["filename"] != tl:
+            rem, add = patch_lines(f.get("patch"))
+            lost = [r for r in rem if re.match(r"^#{1,6} \S", r) and r not in add]
+            if lost:
+                fails.append(("structure", "%s drops the heading %r" % (f["filename"], lost[0][:50])))
     for f in files:  # a verified criterion must never be unticked (PR 60)
         rem, add = patch_lines(f.get("patch"))
         ticked = [r.lstrip()[len("- [x]"):].strip()[:40] for r in rem if r.lstrip().startswith("- [x]")]
