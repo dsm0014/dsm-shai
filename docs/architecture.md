@@ -162,6 +162,23 @@ Headless cron job that:
 - Commits spec improvements and updates `specs/00-index.md`
 - Verified in cluster via proxy; GitHub token for write access
 
+### Haiku via the Claude Code CLI (Spec 12)
+
+- Haiku runs through a wrapper script around the Claude Code CLI in the Hermes pod, on the owner's subscription, with no API key and no API credits.
+- The CLI gets no tools. The wrapper caps calls per day, parallel calls, and time.
+- It reaches api.anthropic.com only through the Squid egress proxy.
+- Its audit log holds no prompt or response text.
+- LiteLLM stays local-only and has no Anthropic provider.
+
+### Hermes Swarm Orchestration (Spec 13)
+
+- The swarm engine runs inside the Hermes pod.
+- Haiku plans and judges, while local qwen3.5:9b does the bounded steps.
+- A script routes each step by its tag and retry count. A model never picks its own tier.
+- At most two local calls and a configured number of Haiku calls run at once.
+- Only non-LLM verifiers decide that a step succeeded.
+- Hard caps (steps, Haiku calls, wall clock) and kill switches (hermes pause and disabled flag files) end a run.
+
 ---
 
 ## Deploy Layout
