@@ -179,6 +179,23 @@ Headless cron job that:
 - Only non-LLM verifiers decide that a step succeeded.
 - Hard caps (steps, Haiku calls, wall clock) and kill switches (hermes pause and disabled flag files) end a run.
 
+### Autonomous Repo Work (Spec 14)
+
+- It picks the first task marked for the swarm in the task list.
+- Each step edits one file, and workers return the whole file.
+- Scripts verify the result (allowed paths, size and heading checks, and the repository tests) and open a pull request.
+- It never merges.
+- Only one swarm pull request is open at a time.
+
+### Repo Maintainer (Spec 16)
+
+- It runs as a Kubernetes CronJob in the hermes namespace because Hermes cron cannot carry the GitHub token.
+- It reviews open swarm pull requests with script gates and a Haiku veto.
+- Its modes are observe, merge, and merge-and-run.
+- The repositories are configurable and need two allowlists.
+- Merges are limited per pass and per day.
+- It can queue and start the next task.
+
 ---
 
 ## Deploy Layout
