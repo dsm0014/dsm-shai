@@ -63,7 +63,7 @@ configMapGenerator:
   - name: maintainer-env
     literals:
       - MAINT_ALLOWED_REPOS=dsm0014/dsm-shai
-      - MAINT_MODE_DEFAULT=observe
+      - MAINT_MODE_DEFAULT=merge
       - MAINT_REVIEWER=haiku
       # Default merge limits for every repo (repos.yaml overrides per repo). 100 a day, one per pass: a pass runs every 15 minutes.
       - MAINT_MAX_MERGES_PER_DAY=100
@@ -73,8 +73,8 @@ configMapGenerator:
     literals:
       - SWARM_ALLOWED_REPOS=dsm0014/dsm-shai
       - SWARM_HAIKU_PARALLEL=2
-      # Spec 14: the repo-work job does nothing unless this is 1. Flip it in a reviewed PR when you want it live.
-      - SWARM_REPO_WORK=0
+      # Spec 14: the repo-work job does nothing unless this is 1. Set to 1 by owner decision (2026-11-25).
+      - SWARM_REPO_WORK=1
   # Spec 12: Claude Haiku through the Claude Code CLI (subscription), mounted read-only at /opt/jobs/claude-haiku.
   - name: hermes-claude-haiku
     files:
