@@ -43,12 +43,15 @@ spec:
         - name: seed-config
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c", "chown 10000:10000 /opt/data && chmod 0750 /opt/data && cp /config/config.yaml /opt/data/config.yaml && chown 10000:10000 /opt/data/config.yaml && echo seeded"]
+          command: ["/bin/sh", "-c", "chown 10000:10000 /opt/data && chmod 0750 /opt/data && cp /config/config.yaml /opt/data/config.yaml && chown 10000:10000 /opt/data/config.yaml && cp /config/SOUL.md /opt/data/SOUL.md && chown 10000:10000 /opt/data/SOUL.md && mkdir -p /opt/data/skills/custom && cp -r /skills/. /opt/data/skills/custom/ && chown -R 10000:10000 /opt/data/skills/custom && echo seeded"]
           volumeMounts:
             - name: home
               mountPath: /opt/data
             - name: config
               mountPath: /config
+              readOnly: true
+            - name: skills                     # 2026-11-25: custom skills, copied into /opt/data/skills/custom
+              mountPath: /skills
               readOnly: true
       securityContext:
         runAsNonRoot: true
@@ -152,6 +155,7 @@ spec:
             - {name: swarm-template-job, mountPath: /opt/jobs/swarm-template, readOnly: true}
             - {name: swarm-repo-work-job, mountPath: /opt/jobs/swarm-repo-work, readOnly: true}
             - {name: repo-maintainer-job, mountPath: /opt/jobs/repo-maintainer, readOnly: true}
+            - {name: openviking-watch-job, mountPath: /opt/jobs/openviking-watch, readOnly: true}
         - name: metrics                         # spec 11: serves /opt/data/nightly-specter/metrics.prom on 9101, read-only
           image: docker.io/nousresearch/hermes-agent:v0.23.1@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
           imagePullPolicy: IfNotPresent
@@ -176,6 +180,12 @@ spec:
         - name: config
           configMap:
             name: hermes-config
+        - name: skills                         # 2026-11-25: custom skills (repo-review, openviking-memory), read by seed-config
+          configMap:
+            name: hermes-skills
+            items:
+              - {key: repo-review, path: repo-review/SKILL.md}
+              - {key: openviking-memory, path: openviking-memory/SKILL.md}
         - name: workspace
           emptyDir:
             sizeLimit: 10Gi
@@ -255,3 +265,10 @@ spec:
               - {key: prompt-a-vectors, path: prompts/a-vectors.v1.txt}
               - {key: prompt-a-spec, path: prompts/a-spec.v1.txt}
               - {key: prompt-b-implement, path: prompts/b-implement.v1.txt}
+        - name: openviking-watch-job           # 2026-11-25 OpenViking link watch (no-agent cron), read-only
+          configMap:
+            name: hermes-openviking-watch
+            defaultMode: 0555
+            items:
+              - {key: watch.py, path: watch.py}
+              - {key: register-cron.sh, path: register-cron.sh}

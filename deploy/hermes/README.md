@@ -261,3 +261,23 @@ Haiku runs on your Claude subscription, not the API. No API key exists anywhere;
 ## Discord (spec 15, not built)
 
 The gateway the pod already runs has a Discord adapter. The design (owner-only allowlist, swarm `quick_commands`, a digest cron that posts results, `discord_admin` off) and the open questions are in `specs/15-hermes-discord.md`. The egress for it is in place (restricted listener allows the Discord hosts); the secret, config and `swarm-chat.sh` are not.
+
+## Memory, skills, SOUL and the OpenViking watch (2026-11-25)
+
+Why: the Hermes state database and the OpenViking memory store showed that most archived sessions never became memories. The extraction model was too weak (`vision` alias, `qwen2.5vl:3b`, 60 failed extractions on 2026-11-19 to 21), the OpenViking link kept parking, and `search` was excluded even though the model kept calling it. See `deploy/openviking/README.md` for the extraction fix.
+
+- **`SOUL.md`** (`deploy/hermes/SOUL.md`, ConfigMap `hermes-config`) is copied to `/opt/data/SOUL.md` by `seed-config` on every start. The repo is the source of truth; edits made inside the pod are overwritten on restart. It keeps the original text and adds three rules: use only the tools you were given, save a durable memory once with `remember`, and follow `repo-review` for repository status.
+- **Custom skills** (`deploy/hermes/skills/`, ConfigMap `hermes-skills`) are copied to `/opt/data/skills/custom/` on every start:
+  - `repo-review`: fixed checks (open pull requests, recent merges, tasklist counts, swarm digest) for "review the repo" requests. It uses the `GITHUB_TOKEN` environment variable, never prints it, and does not use web search.
+  - `openviking-memory`: the OpenViking tools Hermes has, when to save, the `search` rule (`detail` needs `mode=context`), and what the common errors mean.
+- **`search` is exposed** in `tools.mcp_servers.openviking.tools.include`. Test it on the current model (`ministral-3:14b`) before relying on it. If it still fails, remove `search` from `include` (the skill stays as a reference).
+- **OpenViking link watch**: `deploy/hermes/jobs/openviking-watch/` (`watch.py`, `register-cron.sh`). It reads the gateway log since its last run, counts MCP parks of the `openviking` server, and checks `/health`. It prints one line per problem and nothing when all is well. Register it paused, then resume after a clean run:
+
+  ```
+  sh /opt/jobs/openviking-watch/register-cron.sh --apply   # writes /opt/data/scripts/openviking-watch.sh, then creates the paused job
+  hermes cron resume <id>
+  ```
+
+  Offline tests: `python3 -m unittest deploy/hermes/jobs/openviking-watch/tests/test_watch.py`.
+
+Not done here: a "repo status" scheduled job. It needs `GITHUB_TOKEN`, which Hermes cron scripts cannot read, so it belongs in a Kubernetes CronJob like the maintainer. Discord delivery of the watch output waits for spec 15.

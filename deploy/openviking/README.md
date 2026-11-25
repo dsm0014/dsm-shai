@@ -60,3 +60,13 @@ curl -s -H "X-API-Key: $ROOT" -H 'Content-Type: application/json' \
   http://openviking.openviking.svc:1933/api/v1/admin/accounts \
   -d '{"account_id":"<name>","admin_user_id":"<user>"}'
 ```
+
+## Memory extraction (2026-11-25)
+
+Why sessions were not recorded: every archived Hermes session goes through a memory-extraction step that calls the `vlm` model. That model was the `vision` alias (`qwen2.5vl:3b`, a small vision model) with no retries. 60 sessions failed between 2026-11-19 and 2026-11-21 (41 empty responses and 19 responses that could not be parsed after four attempts each). OpenViking marks each failure with a `.failed.json` next to the session and does not retry it.
+
+- **Model:** `ov.conf` `vlm.model` is now `chat` (LiteLLM alias for `ministral-3:14b`, which passed 21 of 21 tool replays), with `max_retries` 2. Extraction shares the GPU with chat, and chat allows two parallel requests, so extraction may queue behind a chat request. That is expected: extraction is background work.
+- **Watch:** `extraction-watch-cronjob.yaml` runs every six hours in the `openviking` namespace. It mounts the data volume read-only, counts `.failed.json` files from the last 24 hours, and exits non-zero when there are any, so the Job shows as failed. Read the result with `kubectl -n openviking get jobs` and `kubectl -n openviking logs job/<name>`. It runs on the node that holds `openviking-data` (local-path, ReadWriteOnce).
+- **Link to Hermes:** the Hermes-side watch (`deploy/hermes/jobs/openviking-watch/`) reports parks of the MCP link. Parks were the other cause of lost memories.
+
+**Open after merge:** re-run the extraction for the 60 failed sessions. Nothing re-queues them automatically. Find the OpenViking endpoint that re-queues a session's extraction first (check the API, not guesses), run it on one failed session, check that `memories/` gains a document and that no new `.failed.json` appears, then do the rest.
