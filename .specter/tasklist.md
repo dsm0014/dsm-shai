@@ -11,7 +11,6 @@ Ordered by what the Hermes state database shows going wrong or being asked for. 
 - [ ] [needs-owner] **Ztunnel enrolment, first (S to M):** on 2026-11-25 Hermes got `Connection reset by peer` from `openviking.openviking.svc:1933` while OpenViking's `/health` returned 200 from inside its own pod. Same symptom as the `wsl --shutdown` enrolment gap below. Confirm it, then build the recovery script (the item in section 3).
 - [ ] [needs-owner] **Swarm repo-work verifier failures (S to M):** `digest.log` shows 24 `repo-work failed: step s1 failed its verifier` (17 on 2026-11-20, 6 on 2026-11-21) and one `arch-diagram` failure. Read the verifier output under `/opt/data/swarm/runs/` for those runs, find the cause, record it in `deploy/hermes/README.md`, and fix the verifier or the task format. Do this before the next unattended run.
 - [ ] [needs-owner] **Hermes terminal-tool reliability (S):** several recent Hermes sessions restate "use only your terminal tool, not web search" to get a `curl` run. Settle the `make hermes-task` example (the existing item in section 6) and add the fix to `deploy/hermes/README.md`.
-- [ ] [needs-owner] **Read OpenViking memories (S):** the OpenViking memories were not read on 2026-11-25 because the API key is only in the OpenViking pod's environment. Use a key the owner provides through `sops`, then re-run this prioritisation against them.
 
 ## S. Swarm queue (small tasks the swarm does, one file each)
 
