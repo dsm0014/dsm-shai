@@ -105,6 +105,23 @@ def check_plan(plan, files):
     return []
 
 
+def last_attempt_decision(repo, task_text):
+    """(PR number, text) for the latest closed, unmerged swarm PR for this task: the maintainer's reason for closing it
+    when it left one, else an empty text. (None, "") when the task has never been attempted. The title is the one the
+    engine gives its PRs (the same expression below), so the match is exact."""
+    title = "swarm: " + re.sub(r"\[[^\]]*\]\s*|`", "", task_text)[:70]
+    pulls = api("GET", "/repos/%s/pulls?state=closed&per_page=100" % repo)
+    for p in sorted(pulls, key=lambda p: p.get("number", 0), reverse=True):
+        if p.get("title") != title or p.get("merged_at"):
+            continue
+        for c in reversed(api("GET", "/repos/%s/issues/%d/comments?per_page=100" % (repo, p["number"]))):
+            body = c.get("body") or ""
+            if "closing this PR" in body:
+                return p["number"], body[:1500]
+        return p["number"], ""
+    return None, ""
+
+
 def main(task, run, swarm, lockf, state_name):
     """Returns the exit code. `run` is a swarm.Run; `swarm` the swarm module (passed in to avoid a circular import)."""
     repo = task["repo"]
@@ -141,6 +158,12 @@ def main(task, run, swarm, lockf, state_name):
             plan = static_plan(info)
             print(json.dumps({"task": info, "allowed_paths": info["files"], "plan": plan}, indent=1))
             raise Refused("ok-dry")
+        # decision log: if this task was attempted before, the maintainer's reason for closing that attempt goes to the worker
+        attempt_no, decision = None, ""
+        try:
+            attempt_no, decision = last_attempt_decision(repo, info["text"])
+        except Exception as exc:  # GitHub unreachable: the attempt still runs, without the history
+            lib.digest("repo-work: attempt history unavailable (%s)" % exc)
         # clone and branch
         default = api("GET", "/repos/%s" % repo).get("default_branch", "main")
         url = os.environ.get("SWARM_CLONE_URL") or "https://github.com/%s.git" % repo
@@ -179,6 +202,9 @@ def main(task, run, swarm, lockf, state_name):
             s["orig_text"] = "" if text_of[s["inputs"][0]] == "(new file)" else text_of[s["inputs"][0]]
             s["instruction"] = (s["instruction"] + "\nTask: " + info["text"] + "\nReply with the COMPLETE new content of the file in one fenced block (```file ... ```), nothing else. "
                                 "Return the WHOLE file: every line that does not need to change must be copied unchanged. Do not return only the changed part.")
+            if decision:  # a re-attempt: the maintainer's reason for closing the last one is the decision log the new file must answer
+                s["instruction"] += ("\nThis task was attempted before in PR #%s and the maintainer closed that attempt. The new file must not repeat these defects:\n%s"
+                                     % (attempt_no, workers.untrusted("maintainer's reason for closing the previous attempt", decision)))
         run.execute(plan, items)
         # apply
         for s in plan["steps"]:
