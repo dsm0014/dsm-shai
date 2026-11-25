@@ -23,7 +23,7 @@ export CHECK
 export SWARM_ORCHESTRATOR
 export SWARM_HAIKU_PARALLEL
 
-.PHONY: check help start stop status verify hermes-task hermes-pause hermes-resume \
+.PHONY: check help start stop status verify mesh-enrolment mesh-enrolment-fix hermes-task hermes-pause hermes-resume \
         claude-haiku-preflight swarm-preflight swarm-plan swarm-run swarm-status swarm-stop swarm-test maint-preflight maint-plan maint-run maint-status maint-stop maint-suspend maint-resume maint-test nightly-preflight nightly-dry-run nightly-run nightly-status test
 
 help: ## List the targets
@@ -42,7 +42,13 @@ start: ## Start k3s and wait for the node (needs sudo)
 	@timeout 180 sh -c 'until kubectl get nodes >/dev/null 2>&1; do sleep 3; done' || { echo "API server did not come up: journalctl -u k3s -n 50"; exit 1; }
 	kubectl wait --for=condition=Ready node --all --timeout=180s
 	@$(MAKE) --no-print-directory status
-	@echo "After a restart, pods ztunnel did not enrol may hang: see deploy/istio/README.md, 'Restart recovery'."
+	@echo "After a restart, pods ztunnel did not enrol may hang: run 'make mesh-enrolment' (read-only) and 'make mesh-enrolment-fix' (see deploy/istio/README.md, 'Restart recovery')."
+
+mesh-enrolment: ## Spec 08: list ambient pods that ztunnel did not enrol since it restarted (read-only)
+	bash scripts/mesh-enrolment.sh
+
+mesh-enrolment-fix: ## Spec 08: delete the pods listed by mesh-enrolment so their controllers recreate them (PVCs kept)
+	bash scripts/mesh-enrolment.sh --apply
 
 stop: ## Stop k3s and every container, frees the GPU (asks first; YES=1 skips; needs sudo)
 	@if [ "$(YES)" != "1" ]; then read -r -p "Stop k3s and ALL workloads (Ollama, Hermes, everything)? [y/N] " a; [ "$$a" = y ] || { echo aborted; exit 1; }; fi

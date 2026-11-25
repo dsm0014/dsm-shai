@@ -15,7 +15,8 @@ Ambient, with no sidecars. Sidecars cost roughly 50 to 100 MB per pod, which doe
 ### Restart recovery (after `wsl --shutdown`, 2026-11-16)
 
 - ztunnel does not re-enrol pods that were already running when it restarted. Their access log shows `connection refused` (HBONE, port 15008) or `connection reset by peer` from the clients, and the pod never logs `pod received, starting proxy`.
-- Fix: delete the affected pods (the Deployment or StatefulSet recreates them, PVCs are kept). Pods that came up after ztunnel are fine. Check with `kubectl -n istio-system logs <ztunnel> | grep "pod received"`.
+- Fix: delete the affected pods (the Deployment or StatefulSet recreates them, PVCs are kept). Pods that came up after ztunnel are fine. Check with `make mesh-enrolment` (read-only; lists every running ambient pod with a controller that ztunnel did not enrol since it last started), then `make mesh-enrolment-fix` to delete them. Host-network pods (node-exporter) cannot be enrolled and are skipped.
+- Symptoms in Prometheus and ztunnel logs: `connection closed due to policy rejection: explicitly denied by: istio-system/istio_converted_static_strict` for an unenrolled source (its plaintext traffic fails STRICT mTLS), and `io error: Connection refused` toward a destination pod that was replaced (ztunnel still holds its old endpoint). Recreating the source pod fixes the first; wait for ztunnel to pick up the new endpoint, or recreate the caller, for the second.
 - Affected here: `openviking`, `litellm`, `litellm/postgres-0`, `monitoring/prometheus-...-0` (seen again after the PR #9 rollout; Kiali could not reach Prometheus until its pod was recreated). Hermes then needs its own restart so its MCP client reconnects; a `rollout restart` is reverted by Flux on the next reconcile, so delete the pod instead.
 
 ## Memory budget (measured, `kubectl top`)
