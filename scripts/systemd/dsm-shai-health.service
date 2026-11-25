@@ -1,0 +1,9 @@
+[Unit]
+Description=dsm-shai swarm and cluster health check (reports and fixes the ztunnel enrolment gap, spec 08)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PATH=/home/dsm0014/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash /mnt/c/Users/danth/Code/dsm-shai/scripts/swarm-health.sh

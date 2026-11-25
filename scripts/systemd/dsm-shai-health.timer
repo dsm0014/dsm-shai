@@ -1,0 +1,10 @@
+[Unit]
+Description=dsm-shai swarm and cluster health check every 30 minutes
+
+[Timer]
+OnCalendar=*:00,30:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
