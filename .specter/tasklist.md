@@ -54,14 +54,14 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 
 - [ ] [needs-owner] **Mesh metrics and dashboard (M; closes the open item in specs 06 and 08):** scrape istiod, ztunnel and the ingress gateway with a ServiceMonitor or PodMonitor in `deploy/monitoring/`, provision an Istio dashboard in Grafana, check the series in Prometheus, record it in `deploy/monitoring/README.md` and `deploy/istio/README.md`.
 - [ ] [needs-owner] **Alert fire tests (S to M; spec 06):** VRAM above a lowered threshold, a crash-looping test pod, PVC fill. Tick the criterion only if all three fire.
-- [ ] [needs-owner] **Virtual keys survive a Postgres restore (S; spec 09):** run it as part of the spec 07 restore drill (section 4), then tick the spec 09 criterion.
+- [ ] [needs-owner] **Virtual keys survive a Postgres restore (S; spec 17):** run it as part of the spec 17 restore drill (section 4), then tick the spec 17 criterion.
 - [ ] [needs-owner] **Recovery script for pods ztunnel did not enrol after `wsl --shutdown` (S to M):** delete the affected pods automatically (seen on `postgres-0`, `openviking`, `prometheus-0`).
 
 ## 4. Needs you at the machine
 
 - [ ] **Spec 01:** second run of the install scripts as a no-op (sudo); `deploy/README.md` bootstrap order.
 - [ ] **Specs 05 and 06:** from a second LAN device, Open WebUI and Grafana are unreachable; from a Windows browser, `open-webui.localhost` and Grafana load.
-- [ ] **Spec 07 (destructive or needs root):** live restore over running PVCs; fresh-cluster restore (second install); k3s datastore snapshot (root); `wsl --export`; observe a restic prune (needs about eight days of snapshots after 2026-11-16).
+- [ ] **Spec 17 (destructive or needs root):** live restore over running PVCs; fresh-cluster restore (second install); k3s datastore snapshot (root); `wsl --export`; observe a restic prune (needs about eight days of snapshots after 2026-11-16).
 
 ## 5. Spec 11: nightly specter improvement (built, merged, inert)
 

@@ -56,7 +56,7 @@ Make the git repo the single source of truth for cluster state by running Flux o
 - Rollback is a `git revert` of the offending commit, and the cluster converges back to the previous state.
 
 **Backup interaction**
-- The spec 07 backup scope adds the `sops-age` Secret in `flux-system` (or the offline age key it comes from) as needed to rebuild, and the restore doc is rewritten so the rebuild is: install k3s, restore the age key, run `bootstrap-flux.sh`, and restore PVC data.
+- The rebuild procedure (install k3s, restore the age key, run `bootstrap-flux.sh`, restore PVC data) and the `sops-age` Secret backup are owned by spec 17 (Disaster Recovery).
 
 ## Acceptance Criteria
 - [ ] Flux is installed from pinned versions with only source, kustomize and helm controllers, and the measured controller memory is recorded and within budget.
@@ -70,5 +70,5 @@ Make the git repo the single source of truth for cluster state by running Flux o
 - [ ] Deleting a manifest from git removes the workload but not its PVC (prune-exempt).
 - [ ] `git revert` of a bad HelmRelease bump restores the previous working release.
 - [ ] Flux can reach the Git host or registry and chart repos under `REGISTRY_ONLY` egress, and no other workload can.
-- [ ] A rebuild from scratch (wiped k3s, restored age key, bootstrap script, restored data) matches the previous cluster state and is documented in `docs/restore.md`.
+- Moved to spec 17: the rebuild from scratch (wiped k3s, restored age key, bootstrap script, restored data).
 - [ ] `deploy/flux/README.md` documents the source choice, bootstrap, layout, dependency order, secrets workflow and the override and rollback procedures.

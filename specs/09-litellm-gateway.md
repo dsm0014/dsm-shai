@@ -57,5 +57,6 @@ Deploy the free open-source LiteLLM proxy (no enterprise-licensed features) in i
 - [x] Two concurrent `chat` requests are queued or limited without a model-swap thrash, and a cold-swap request completes without timing out.
 - [ ] No cloud provider is configured, and no fallback is triggered when Ollama is down (the request behaviour is bounded by the 180 s timeout). No cloud provider and no fallback are verified; an outage is bounded by the 180 s timeout (see deploy/litellm/README.md).
 - [x] LiteLLM metrics appear in Prometheus (spec 06) with per-key and per-model labels. Logs contain no prompt or response content by default.
-- [ ] A secret scan finds no master key, virtual key, or DB password in Git. A Postgres backup and restore (spec 07) preserves virtual keys.
+- [ ] A secret scan finds no master key, virtual key, or DB password in Git.
+- Moved to spec 17: a Postgres backup and restore preserves virtual keys.
 - [ ] `deploy/litellm/README.md` documents the model aliases, key provisioning, MCP server registration and the DB-dependent features.
