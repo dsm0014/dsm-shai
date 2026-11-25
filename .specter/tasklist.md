@@ -8,7 +8,6 @@ Markers: `[swarm]` = queued for the Hermes swarm (small, one named file; the rep
 
 Ordered by what the Hermes state database shows going wrong or being asked for. Work top to bottom.
 
-- [ ] [needs-owner] **Ztunnel enrolment, first (S to M):** on 2026-11-25 Hermes got `Connection reset by peer` from `openviking.openviking.svc:1933` while OpenViking's `/health` returned 200 from inside its own pod. Same symptom as the `wsl --shutdown` enrolment gap below. Confirm it, then build the recovery script (the item in section 3).
 - [ ] [needs-owner] **Swarm repo-work verifier failures (S to M):** `digest.log` shows 24 `repo-work failed: step s1 failed its verifier` (17 on 2026-11-20, 6 on 2026-11-21) and one `arch-diagram` failure. Read the verifier output under `/opt/data/swarm/runs/` for those runs, find the cause, record it in `deploy/hermes/README.md`, and fix the verifier or the task format. Do this before the next unattended run.
 - [ ] [needs-owner] **Hermes terminal-tool reliability (S):** several recent Hermes sessions restate "use only your terminal tool, not web search" to get a `curl` run. Settle the `make hermes-task` example (the existing item in section 6) and add the fix to `deploy/hermes/README.md`.
 
@@ -63,7 +62,6 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 - [ ] [needs-owner] **Mesh metrics and dashboard (M; closes the open item in specs 06 and 08):** scrape istiod, ztunnel and the ingress gateway with a ServiceMonitor or PodMonitor in `deploy/monitoring/`, provision an Istio dashboard in Grafana, check the series in Prometheus, record it in `deploy/monitoring/README.md` and `deploy/istio/README.md`.
 - [ ] [needs-owner] **Alert fire tests (S to M; spec 06):** VRAM above a lowered threshold, a crash-looping test pod, PVC fill. Tick the criterion only if all three fire.
 - [ ] [needs-owner] **Virtual keys survive a Postgres restore (S; spec 09):** run it as part of the spec 07 restore drill (section 4), then tick the spec 09 criterion.
-- [ ] [needs-owner] **Recovery script for pods ztunnel did not enrol after `wsl --shutdown` (S to M):** delete the affected pods automatically (seen on `postgres-0`, `openviking`, `prometheus-0`).
 
 ## 4. Needs you at the machine
 
