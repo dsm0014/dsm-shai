@@ -4,6 +4,7 @@ namespace: openviking
 resources:
   - openviking.yaml
   - egress-networkpolicy.yaml
+  - extraction-watch-cronjob.yaml
 configMapGenerator:
   - name: openviking-config
     files:

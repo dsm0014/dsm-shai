@@ -10,6 +10,18 @@ configMapGenerator:
   - name: hermes-config
     files:
       - config.yaml
+      # SOUL.md is copied into /opt/data by the seed-config init container on every start (the repo is the source of truth).
+      - SOUL.md
+  # Custom skills (2026-11-25), copied into /opt/data/skills/custom by seed-config. Keys are <skill>/SKILL.md paths.
+  - name: hermes-skills
+    files:
+      - repo-review=skills/repo-review/SKILL.md
+      - openviking-memory=skills/openviking-memory/SKILL.md
+  # OpenViking link watch (2026-11-25): a no-agent cron script at /opt/jobs/openviking-watch. Tests stay out.
+  - name: hermes-openviking-watch
+    files:
+      - watch.py=jobs/openviking-watch/watch.py
+      - register-cron.sh=jobs/openviking-watch/register-cron.sh
   # Spec 11 nightly job: scripts and prompts, mounted read-only at /opt/jobs/nightly-specter. Tests stay out.
   - name: hermes-nightly-specter
     files:

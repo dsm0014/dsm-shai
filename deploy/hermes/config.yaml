@@ -41,6 +41,7 @@ mcp_servers:
     headers:
       X-API-Key: "${OPENVIKING_KEY}"
     tools:
-      # Only the simple memory tools. OpenViking's search tool has a conditional parameter (detail needs mode=context)
-      # that the model gets wrong, so search is excluded.
-      include: ["find", "remember", "read", "list"]
+      # search is exposed again (2026-11-25). Its conditional parameter (detail needs mode=context) is documented in the
+      # openviking-memory skill. Re-test on ministral-3:14b after this change; if the model still gets it wrong, remove
+      # "search" here and the skill's search section stays as a reference only.
+      include: ["find", "remember", "read", "list", "search"]
