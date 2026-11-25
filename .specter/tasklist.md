@@ -4,6 +4,15 @@
 
 Markers: `[swarm]` = queued for the Hermes swarm (small, one named file; the repo maintainer merges what it opens); `[needs-owner]` = not for the swarm (needs the cluster, a second device, a decision, or a file too large for a worker). Section S is the swarm queue; the maintainer's `auto_queue` may add `[swarm]` to short tasks that name one to three small existing files.
 
+## P. Priority (from Hermes's own state, 2026-11-25)
+
+Ordered by what the Hermes state database shows going wrong or being asked for. Work top to bottom.
+
+- [ ] [needs-owner] **Ztunnel enrolment, first (S to M):** on 2026-11-25 Hermes got `Connection reset by peer` from `openviking.openviking.svc:1933` while OpenViking's `/health` returned 200 from inside its own pod. Same symptom as the `wsl --shutdown` enrolment gap below. Confirm it, then build the recovery script (the item in section 3).
+- [ ] [needs-owner] **Swarm repo-work verifier failures (S to M):** `digest.log` shows 24 `repo-work failed: step s1 failed its verifier` (17 on 2026-11-20, 6 on 2026-11-21) and one `arch-diagram` failure. Read the verifier output under `/opt/data/swarm/runs/` for those runs, find the cause, record it in `deploy/hermes/README.md`, and fix the verifier or the task format. Do this before the next unattended run.
+- [ ] [needs-owner] **Hermes terminal-tool reliability (S):** several recent Hermes sessions restate "use only your terminal tool, not web search" to get a `curl` run. Settle the `make hermes-task` example (the existing item in section 6) and add the fix to `deploy/hermes/README.md`.
+- [ ] [needs-owner] **Read OpenViking memories (S):** the OpenViking memories were not read on 2026-11-25 because the API key is only in the OpenViking pod's environment. Use a key the owner provides through `sops`, then re-run this prioritisation against them.
+
 ## S. Swarm queue (small tasks the swarm does, one file each)
 
 Order matters only where a task says "after"; the swarm takes the first queued task and the maintainer merges its pull request before the next starts. Only the edited file is in backticks.
