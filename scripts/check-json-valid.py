@@ -17,7 +17,8 @@ def main():
     problems = []
     for path in paths:
         try:
-            with open(path, encoding="utf-8") as fh:
+            # utf-8-sig: a UTF-8 byte-order mark is allowed; json.load would reject it as text.
+            with open(path, encoding="utf-8-sig") as fh:
                 json.load(fh)
         except Exception as exc:
             problems.append((path, exc))
