@@ -94,5 +94,88 @@ class EscalationTests(unittest.TestCase):
         self.assertTrue(any("escalation failed at clone" in l for l in self.digest_lines()), self.digest_lines())
 
 
+def pr_files(*files):
+    """What GitHub's pulls/<n>/files returns for a PR: each file with its status and hunk-only patch."""
+    return lambda method, path, body=None, raw=False: list(files)
+
+
+def f(name, *changes, status="modified"):
+    lines = ["@@ -26,1 +26,1 @@"]
+    for old, new in changes:
+        lines += ["-" + old, "+" + new]
+    return {"filename": name, "status": status, "patch": "\n".join(lines)}
+
+
+SWARM = "- [ ] [swarm] **CI check, makefile help:** create the new file `scripts/check-makefile-help.py`."
+DEMOTED = SWARM.replace("[swarm]", "[needs-owner]", 1)
+
+
+class DemotionOnly(unittest.TestCase):
+    def check(self, *files):
+        with mock.patch.object(maint, "api", pr_files(*files)):
+            return maint.demotion_only(REPO, 7, TL)
+
+    def test_one_line_swarm_to_needs_owner_is_merged(self):
+        self.assertTrue(self.check(f(TL, (SWARM, DEMOTED))))
+
+    def test_swarm_deploy_to_needs_owner_is_merged(self):
+        self.assertTrue(self.check(f(TL, (SWARM.replace("[swarm]", "[swarm-deploy]"), DEMOTED))))
+
+    def test_text_changed_on_the_same_line_is_refused(self):
+        self.assertFalse(self.check(f(TL, (SWARM, DEMOTED.replace("makefile help", "make help")))))
+
+    def test_two_changed_lines_are_refused(self):
+        self.assertFalse(self.check(f(TL, (SWARM, DEMOTED), ("- [ ] [swarm] **x:** y", "- [ ] [needs-owner] **x:** y"))))
+
+    def test_another_file_in_the_pr_is_refused(self):
+        self.assertFalse(self.check(f(TL, (SWARM, DEMOTED)), f("scripts/x.py", ("a", "b"))))
+
+    def test_a_line_already_needs_owner_is_refused(self):
+        self.assertFalse(self.check(f(TL, (DEMOTED, DEMOTED))))
+
+    def test_a_line_that_is_not_a_swarm_item_is_refused(self):
+        self.assertFalse(self.check(f(TL, ("- [ ] Plain item.", "- [ ] [needs-owner] Plain item."))))
+
+
+class MergeDemotions(unittest.TestCase):
+    def setUp(self):
+        self.state = tempfile.mkdtemp(prefix="demote-")
+        self.patch = mock.patch.object(maint, "STATE", self.state)
+        self.patch.start()
+
+    def tearDown(self):
+        self.patch.stop()
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def test_merges_only_the_one_line_demotion(self):
+        one_line = f(TL, (SWARM, DEMOTED))
+        two_lines = f(TL, (SWARM, DEMOTED), ("- [ ] [swarm] **x:** y", "- [ ] [needs-owner] **x:** y"))
+        title = "maintainer: mark a failing task [needs-owner] (makefile help)"
+        pulls = [{"number": 1, "title": title, "head": {"ref": "maintainer/needs-owner-a", "sha": "s1"}},
+                 {"number": 2, "title": title, "head": {"ref": "maintainer/needs-owner-b", "sha": "s2"}},
+                 {"number": 3, "title": "swarm: something", "head": {"ref": "swarm/x", "sha": "s3"}}]
+        calls = []
+
+        def api(method, path, body=None, raw=False):
+            calls.append((method, path))
+            if method == "GET" and path.startswith("/repos/%s/pulls?state=open" % REPO):
+                return pulls
+            if method == "GET" and path.endswith("/files?per_page=100&page=1"):
+                return [one_line] if "/pulls/1/" in path else [two_lines]
+            if method == "GET" and path == "/repos/%s/pulls/1" % REPO:
+                return {"head": {"sha": "s1", "ref": "maintainer/needs-owner-a"}, "state": "open"}
+            if method == "PUT" and path == "/repos/%s/pulls/1/merge" % REPO:
+                return {"sha": "merged1"}
+            return {}
+
+        report = {"merged": 0}
+        with mock.patch.object(maint, "api", api):
+            maint.merge_demotions({"repo": REPO, "tasklist_path": TL, "max_merges_per_run": 1}, report)
+        self.assertEqual(report["merged"], 1)
+        merges = [p for m, p in calls if m == "PUT"]
+        self.assertEqual(merges, ["/repos/%s/pulls/1/merge" % REPO])
+        self.assertFalse(any(p.startswith("/repos/%s/pulls/3" % REPO) for _, p in calls), "swarm PRs are never touched here")
+
+
 if __name__ == "__main__":
     unittest.main()

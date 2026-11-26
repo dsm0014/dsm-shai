@@ -337,6 +337,46 @@ def merge_pr(repo, n, sha):
     return res.get("sha", "")
 
 
+def demotion_only(repo, n, tasklist_path):
+    """True when PR n changes only the task list, and that change is one line: a [swarm] or [swarm-deploy] item becomes
+    [needs-owner] and nothing else on the line changes. The only kind of task-list PR the maintainer may merge itself."""
+    files = pull_files(repo, n)
+    if [f.get("filename") for f in files] != [tasklist_path] or files[0].get("status") != "modified":
+        return False
+    rem, add = [], []
+    for l in (files[0].get("patch") or "").splitlines():
+        if l.startswith("@@") or l.startswith("\\"):
+            continue
+        if l.startswith("-"):
+            rem.append(l[1:])
+        elif l.startswith("+"):
+            add.append(l[1:])
+    if len(rem) != 1 or len(add) != 1 or "[needs-owner]" in rem[0]:
+        return False
+    return add[0] == rem[0].replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1)
+
+
+def merge_demotions(settings, report):
+    """Merge the maintainer's own [needs-owner] escalation PRs when they pass demotion_only, so the queue of tasks that need an
+    owner keeps moving. Counts against max_merges_per_run. Anything else is left for the owner."""
+    repo = settings["repo"]
+    for q in api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo):
+        ref, title = q["head"]["ref"], q.get("title") or ""
+        if not (ref.startswith("maintainer/needs-owner-") and title.startswith("maintainer: mark a failing task")):
+            continue
+        if report["merged"] >= int(settings["max_merges_per_run"]):
+            break
+        try:
+            if not demotion_only(repo, q["number"], settings["tasklist_path"]):
+                continue
+            sha = merge_pr(repo, q["number"], q["head"]["sha"])
+            report["merged"] += 1
+            audit({"event": "merge-demotion", "repo": repo, "pr": q["number"], "sha": sha})
+            digest("merged its own task-list demotion PR #%d (%s)" % (q["number"], title[:80]))
+        except Exception as exc:  # a PR that changed since review, or an API error: try again on the next tick
+            digest("demotion PR #%d not merged: %s" % (q["number"], str(exc)[:160]))
+
+
 def close_pr(repo, n, ref):
     api("PATCH", "/repos/%s/pulls/%d" % (repo, n), {"state": "closed"})
     try:
@@ -530,6 +570,8 @@ def maintain_repo(settings, plan, counters):
                 bump_attempt(key)
         entry["why"] = why[:300]
         report["prs"].append(entry)
+    if mode != "observe" and not plan:
+        merge_demotions(settings, report)  # the maintainer's own one-line [needs-owner] demotions; nothing else it opens is merged
     still_open = any(q["head"]["ref"].startswith(settings["branch_prefix"]) for q in api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo))
     maint_open = any(q["head"]["ref"].startswith("maintainer/") for q in api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo))
     if settings.get("auto_queue") and mode != "observe" and not plan and not still_open and not maint_open:
