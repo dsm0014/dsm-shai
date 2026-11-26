@@ -1,5 +1,5 @@
 # Mesh metrics for the spec 06 Prometheus (spec 08 telemetry). istiod is outside ambient, so its scrape is plain HTTP.
-# ztunnel exposes TCP metrics on 15020 (ztunnel-stats).
+# ztunnel exposes TCP metrics on 15020 (ztunnel-stats). The ingress gateway is outside ambient too: its Envoy stats are on 15090.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -25,5 +25,19 @@ spec:
       app: ztunnel
   podMetricsEndpoints:
     - port: ztunnel-stats
+      path: /stats/prometheus
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-ingressgateway
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+  podMetricsEndpoints:
+    - port: http-envoy-prom
       path: /stats/prometheus
       interval: 30s
