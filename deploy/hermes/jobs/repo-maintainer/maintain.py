@@ -231,8 +231,10 @@ def gates(settings, pr, files, default_red):
     return fails, task
 
 
-def run_tests(settings, pr, workdir):
-    """Fresh clone of the PR head; run the repo's test command. Returns (ok, message)."""
+def run_tests(settings, pr, workdir, evidence=None, files=()):
+    """Fresh clone of the PR head; run the repo's test command. Returns (ok, message). When `evidence` is a list, the run is
+    appended to it as text for the reviewer (command, exit code, output tail, and any new scripts/check-* file run on its own):
+    the reviewer sees only the diff, so the maintainer's own run is the only evidence it can be given."""
     repo = settings["repo"]
     url = os.environ.get("MAINT_CLONE_URL") or "https://github.com/%s.git" % repo
     try:
@@ -246,6 +248,8 @@ def run_tests(settings, pr, workdir):
         if not cmd:
             return (True, "no test command")
         t = subprocess.run(["bash", "-c", cmd], cwd=workdir, capture_output=True, text=True, timeout=envint("MAINT_TEST_TIMEOUT", 1500))
+        if evidence is not None:
+            evidence.append(repo_work.evidence(workdir, list(files), cmd, t))
         return (t.returncode == 0, "tests exit %d" % t.returncode)
     except (subprocess.SubprocessError, OSError) as e:
         return (False, "test run failed: %s" % type(e).__name__)
@@ -290,22 +294,23 @@ def cache_verdict(key, verdict):
     json.dump(data, open(verdicts_path(), "w"))
 
 
-def review(settings, task, files, counters, key=None):
+def review(settings, task, files, counters, key=None, evidence=""):
     """Returns a verdict dict. One review per PR head: a model that answers differently on a second ask must not flip the outcome.
     Any failure to get a clean verdict is `fix` (never merge) and is not cached, so a transient outage is retried."""
     hit = cached_verdict(key) if key else None
     if hit:
         return hit
-    v = _review(settings, task, files, counters)
+    v = _review(settings, task, files, counters, evidence)
     if key and not any("unavailable" in c or "cap reached" in c or "not a valid verdict" in c for c in v.get("concerns", [])):
         cache_verdict(key, v)
     return v
 
 
-def _review(settings, task, files, counters):
+def _review(settings, task, files, counters, evidence=""):
     diff = "\n\n".join("### %s\n%s" % (f["filename"], (f.get("patch") or "(no textual patch)")[:6000]) for f in files)[:30000]
     prompt = open(os.path.join(HERE, "prompts", "review.v1.txt")).read().replace("{{task}}", task["text"] if task else "").replace(
-        "{{diff}}", workers.untrusted("pull request diff", diff))
+        "{{diff}}", workers.untrusted("pull request diff", diff)).replace(
+        "{{evidence}}", workers.untrusted("the maintainer's own run on this pull request head", evidence) if evidence else "(no run recorded)")
     mode = settings["reviewer"]
     if mode == "chat":
         docs_only = all(f["filename"].endswith(".md") for f in files)
@@ -579,12 +584,14 @@ def maintain_repo(settings, plan, counters):
         fails, task = gates(settings, pr, files, default_red)
         if red(repo, pr["head"]["sha"]):  # the PR's own check runs must not be red
             fails.append(("checks", "a check run on the PR head failed"))
+        run_evidence = []  # the maintainer's own test run, handed to the reviewer, which sees only the diff
         ok_tests, test_msg = (False, "skipped: earlier gate failed")
         if not fails:
-            ok_tests, test_msg = run_tests(settings, pr, os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "maint-%d" % n))
+            ok_tests, test_msg = run_tests(settings, pr, os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "maint-%d" % n),
+                                          evidence=run_evidence, files=[f["filename"] for f in files])
             if not ok_tests:
                 fails.append(("tests", test_msg))
-        verdict = review(settings, task, files, counters, key=repo + ":" + str(n) + ":" + pr["head"]["sha"]) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
+        verdict = review(settings, task, files, counters, key=repo + ":" + str(n) + ":" + pr["head"]["sha"], evidence="\n\n".join(run_evidence)) if not fails else {"verdict": "close" if any(c in SEVERE for c, _ in fails) else "fix", "reasons": [], "concerns": []}
         outcome = "merge" if (not fails and verdict["verdict"] == "merge") else ("close" if verdict["verdict"] == "close" or any(c in SEVERE for c, _ in fails) else "fix")
         if outcome == "fix" and mode != "observe":
             # The swarm cannot revise a pull request, and a PR left open blocks the queue (one open swarm PR at a time): close it, count the
