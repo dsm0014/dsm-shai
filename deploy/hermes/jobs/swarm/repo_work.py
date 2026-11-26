@@ -94,6 +94,18 @@ def extract_block(text):
     return body + "\n"
 
 
+def json_wrapper(path, body):
+    """True when a worker returned a JSON object (keys such as file, followups, notes) in place of the file. A JSON object is also
+    a valid Python dict literal, so the python-syntax check cannot catch it in a .py file (PR 184). Not applied to .json targets."""
+    if path.endswith(".json") or not body.lstrip().startswith("{"):
+        return False
+    try:
+        d = json.loads(body)
+    except ValueError:
+        return False
+    return isinstance(d, dict) and bool({"file", "followups", "notes"} & set(d))
+
+
 def _tail(text, n=12):
     lines = [l for l in (text or "").splitlines() if l.strip()]
     return "\n".join(lines[-n:])
@@ -120,6 +132,11 @@ def evidence(workdir, files, cmd, result):
 
 MAX_FOLLOWUPS = 2     # new [swarm] lines one run may add to the task list
 MAX_QUEUED = 20       # the queue is never longer than this, so follow-ups cannot grow without bound
+# Planner-only request for follow-up tasks, appended after the planner's rules. Workers must never see it.
+FOLLOWUP_ASK = ("\nOptional: the JSON object may also have a top-level key \"followups\" (beside \"steps\", never inside a step): up to %d new "
+                "task-list lines, each in exactly this form: - [ ] [swarm] **Short title:** what to change, with 1 to 3 existing files in backticks. "
+                "Include a check that proves it. Only for follow-up work this change makes necessary. Use [] when there is none. "
+                "Never mention followups in a step's instruction: instructions are for the worker, who only edits its own file." % MAX_FOLLOWUPS)
 FOLLOWUP_LINE = re.compile(r"^- \[ \] \[swarm\] \*\*[^*\n]{3,80}:\*\* .{20,}$")
 
 
@@ -231,18 +248,18 @@ def main(task, run, swarm, lockf, state_name):
             items.append({"id": f, "text": text})
         # plan with the orchestrator, then run the steps under the swarm's caps
         history = swarm.recall(" ".join(info["files"]))  # earlier outcomes for these files: memory, untrusted, bounded
-        run.task["goal"] = ("Complete this repository task by editing the listed files, one step per file: " + info["text"]
-                            + ". Also return a JSON key \"followups\": up to %d new task-list lines, each in this exact form: "
-                            "- [ ] [swarm] **Short title:** what to change, with 1 to 3 existing files in backticks. Include a check that proves it. "
-                            "Only for follow-up work this change makes necessary and a worker can do with those files; use [] when there is none."
-                            % MAX_FOLLOWUPS)
+        # The goal reaches the planner and, through its step instructions, the workers, so it carries the task and nothing else.
+        # The follow-up request below goes to the planner alone (see FOLLOWUP_ASK): when it sat in the goal, workers copied it and
+        # returned a JSON object with file, followups and notes keys in place of the file (PR 184).
+        run.task["goal"] = "Complete this repository task by editing the listed files, one step per file: " + info["text"]
         run.task["verifiers"] = ["file_block", "keeps_size"]
         tier = "chat" if run.orch == "chat" else "haiku"
         problems = []
         for _ in (1, 2):
             p = swarm.prompt_text("plan", goal=run.task["goal"], items=workers.untrusted("input names", "\n".join("- %s" % i["id"] for i in items)),
                                   history=workers.untrusted("earlier outcomes for these files", history) if history else "(none recorded)",
-                                  max_steps=len(items), problems=("Your previous plan was invalid: " + "; ".join(problems)) if problems else "")
+                                  max_steps=len(items),
+                                  problems=FOLLOWUP_ASK + (("\nYour previous plan was invalid: " + "; ".join(problems)) if problems else ""))
             plan = swarm.json_in(run.call(tier, p, json_mode=True)) or {}
             problems = swarm.validate_plan(plan, items, len(items)) or (check_plan(plan, info["files"]) if plan.get("steps") else ["no steps"])
             if not problems:
@@ -267,6 +284,8 @@ def main(task, run, swarm, lockf, state_name):
             body = extract_block(run.outputs[s["id"]])
             if body is None or not body.strip():
                 raise swarm.Failed("step %s returned no file block" % s["id"])
+            if json_wrapper(f, body):
+                raise swarm.Failed("step %s returned a JSON object in place of the file" % s["id"])
             orig = next(i["text"] for i in items if i["id"] == f)
             keep = envint("SWARM_MIN_KEEP_PCT", 70)
             if orig != "(new file)" and len(body) * 100 < len(orig) * keep:  # a 9B worker can return a cut-down file that passes every other check
