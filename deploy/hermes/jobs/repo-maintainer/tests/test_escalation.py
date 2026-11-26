@@ -175,6 +175,64 @@ class QueueOnly(unittest.TestCase):
         self.assertFalse(self.check(PLAIN, PLAIN.replace("- [ ] ", "- [ ] [swarm] ", 1).replace("makefile", "make")))
 
 
+GOOD_FOLLOWUP = ("- [ ] [swarm] **Add a token example:** document the new check in `docs/ci-checks.md`. "
+                 "Make make test pass.")
+
+
+class FollowupRules(unittest.TestCase):
+    def test_a_well_formed_follow_up_is_allowed(self):
+        self.assertEqual(maint.repo_work.followup_problem(GOOD_FOLLOWUP), "")
+
+    def test_wrong_format_is_refused(self):
+        self.assertIn("format", maint.repo_work.followup_problem("- [ ] [swarm] short"))
+
+    def test_deploy_or_owner_marker_is_refused(self):
+        self.assertTrue(maint.repo_work.followup_problem(GOOD_FOLLOWUP.replace("[swarm]", "[swarm-deploy]")))
+        self.assertTrue(maint.repo_work.followup_problem(GOOD_FOLLOWUP.replace("[swarm]", "[needs-owner]")))
+
+    def test_forbidden_or_deploy_path_is_refused(self):
+        self.assertTrue(maint.repo_work.followup_problem(GOOD_FOLLOWUP.replace("docs/ci-checks.md", ".github/x.yml")))
+        self.assertTrue(maint.repo_work.followup_problem(GOOD_FOLLOWUP.replace("docs/ci-checks.md", "deploy/istio/x.yaml")))
+
+    def test_too_many_files_is_refused(self):
+        self.assertTrue(maint.repo_work.followup_problem(GOOD_FOLLOWUP.replace("`docs/ci-checks.md`", "`a.md` `b.md` `c.md` `d.md`")))
+
+
+class FollowupsInTheTaskListGate(unittest.TestCase):
+    """The maintainer's gate accepts the task's removal plus up to MAX_FOLLOWUPS new lines, each checked, and refuses the rest."""
+
+    def gate(self, add_lines, existing=("docs/ci-checks.md", "scripts/check-makefile-help.py")):
+        def api(method, path, body=None, raw=False):
+            target = path.split("/contents/")[1].split("?")[0]
+            if target in existing:
+                return {}
+            raise OSError("404 %s" % target)
+        patch = "@@ -26,1 +26,%d @@\n-%s\n%s" % (1 + len(add_lines), SWARM, "\n".join("+" + a for a in add_lines))
+        files = [{"filename": TL, "status": "modified", "patch": patch},
+                 {"filename": "scripts/check-makefile-help.py", "status": "added", "patch": "@@ -0,0 +1 @@\n+x"}]
+        settings = {"repo": REPO, "tasklist_path": TL}
+        with mock.patch.object(maint, "api", api):
+            fails, task = maint.gates(settings, {"base": {"ref": "main"}}, files, False)
+        return [m for c, m in fails if c == "tasklist"], task
+
+    def test_removal_plus_one_valid_follow_up_passes(self):
+        problems, task = self.gate([GOOD_FOLLOWUP])
+        self.assertEqual(problems, [])
+        self.assertIsNotNone(task)
+
+    def test_follow_up_naming_a_missing_file_is_refused(self):
+        problems, _ = self.gate([GOOD_FOLLOWUP.replace("docs/ci-checks.md", "docs/missing.md")])
+        self.assertTrue(any("does not exist" in p for p in problems), problems)
+
+    def test_more_than_the_cap_is_refused(self):
+        problems, _ = self.gate([GOOD_FOLLOWUP] * 3)
+        self.assertTrue(problems)
+
+    def test_a_follow_up_with_a_deploy_marker_is_refused(self):
+        problems, _ = self.gate([GOOD_FOLLOWUP.replace("[swarm]", "[swarm-deploy]")])
+        self.assertTrue(problems)
+
+
 class MergeDemotions(unittest.TestCase):
     def setUp(self):
         self.state = tempfile.mkdtemp(prefix="demote-")

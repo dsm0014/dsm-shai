@@ -168,10 +168,27 @@ def gates(settings, pr, files, default_red):
         fails.append(("tasklist", "the task list file is not part of the change"))
     else:
         rem, add = patch_lines(t.get("patch"))
-        if add or len(rem) != 1 or not re.match(r"^\s*- \[ \] \[swarm(-deploy)?\]", rem[0]):
-            fails.append(("tasklist", "the task list change must remove exactly one unstarted [swarm] line and nothing else"))
+        if len(rem) != 1 or not re.match(r"^\s*- \[ \] \[swarm(-deploy)?\]", rem[0]) or len(add) > repo_work.MAX_FOLLOWUPS:
+            fails.append(("tasklist", "the task list change must remove exactly one unstarted [swarm] line and add at most %d follow-up [swarm] lines"
+                          % repo_work.MAX_FOLLOWUPS))
         else:
-            task = {"text": rem[0].strip(), "files": pick_task.paths_in(rem[0]), "deploy": "[swarm-deploy]" in rem[0]}
+            refused = []
+            for a in add:  # each follow-up the swarm queues is checked like a task: format, paths, and that the files exist on the base branch
+                why = repo_work.followup_problem(a)
+                if not why:
+                    base = (pr.get("base") or {}).get("ref", "main")
+                    for p in repo_work.followup_paths(a):
+                        try:
+                            api("GET", "/repos/%s/contents/%s?ref=%s" % (settings["repo"], p, base))
+                        except Exception:
+                            why = "names a file that does not exist on %s: %s" % (base, p)
+                            break
+                if why:
+                    refused.append("follow-up task refused (%s): %s" % (why, a.strip()[:100]))
+            if refused:  # one refused line fails the whole change: no task is recorded for it
+                fails.extend(("tasklist", m) for m in refused)
+            else:
+                task = {"text": rem[0].strip(), "files": pick_task.paths_in(rem[0]), "deploy": "[swarm-deploy]" in rem[0]}
     if task and not task["files"]:
         fails.append(("tasklist", "the task names no file"))
     if task and not [f for f in by if f != tl]:
