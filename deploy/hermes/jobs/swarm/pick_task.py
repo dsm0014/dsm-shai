@@ -46,7 +46,8 @@ def pick(markdown, skip=()):
             continue  # refused by the caller this run (forbidden path, deploy-class, too many files)
         if excluded_level is not None:
             skipped.append((n, "excluded heading")); continue
-        if "[needs-owner]" in body:
+        # the owner-only marker is a tag before the item's bold title; the same words inside a description do not count
+        if "[needs-owner]" in body.split("**", 1)[0]:
             skipped.append((n, "needs-owner")); continue
         if not re.search(r"\[swarm(-deploy)?\]", body):
             skipped.append((n, "bad marker")); continue
