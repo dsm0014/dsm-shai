@@ -30,43 +30,35 @@
 
 ## Architecture Diagram (Conceptual)
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Windows 11 host: i7-13700KF, RTX 4080 16 GB                                                      │
-│ ┌──────────────────────────────────────────────────────────────────────────────────────────────┐ │
-│ │ WSL2 on ext4: k3s single-node cluster                                                        │ │
-│ │ Istio ambient mesh: mTLS STRICT, default-deny authorization policies                         │ │
-│ │                                                                                              │ │
-│ │ ┌────────────────────┐     ┌────────────────────────┐   ┌────────────────────────────────┐   │ │
-│ │ │                    ├────►│       open-webui       │   │                                │   │ │
-│ │ │   Istio ingress    │     └────────────────────────┘   │          flux-system           │   │ │
-│ │ │      gateway       │                                  │ GitOps: applies every manifest │   │ │
-│ │ │ (host-local only)  │     ┌────────────────────────┐   │      from this repository      │   │ │
-│ │ │                    ├────►│  monitoring (grafana)  │   │                                │   │ │
-│ │ └────────────────────┘     └────────────────────────┘   └────────────────────────────────┘   │ │
-│ │                                                                                              │ │
-│ │                                                                                              │ │
-│ │ ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐   │ │
-│ │ │      ollama       │  │    openviking     │  │      litellm      │  │      hermes       │   │ │
-│ │ │  inference (GPU)  │  │   agent memory    │  │gateway for models │  │   agent, swarm,   │   │ │
-│ │ │                   │  │                   │  │                   │  │    maintainer     │   │ │
-│ │ └───────────────────┘  └───────────────────┘  └───────────────────┘  └─────────┬─────────┘   │ │
-│ │                                                                                │             │ │
-│ │                                                                                ▼             │ │
-│ │                                                                    ┌───────────────────────┐ │ │
-│ │                                                                    │ egress-proxy (Squid)  │ │ │
-│ │                                                                    └───────────┬───────────┘ │ │
-│ │                                                                                │             │ │
-│ └────────────────────────────────────────────────────────────────────────────────┬─────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────────┬───────────────┘
-                                                                                   │
-                                                                                   ▼
-                                                            ┌────────────────────────────────────┐
-                                                            │      External (outbound only)      │
-                                                            │     github.com, api.github.com     │
-                                                            │         api.anthropic.com          │
-                                                            │     discord.com, *.discord.gg      │
-                                                            └────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph host["Windows 11 host: i7-13700KF, RTX 4080 16 GB"]
+        subgraph wsl["WSL2 on ext4: k3s cluster, Istio ambient mesh (mTLS STRICT)"]
+            ingress["Istio ingress gateway<br/>host-local only"]
+            subgraph ns["Namespaces"]
+                webui["open-webui"]
+                mon["monitoring<br/>(grafana)"]
+                hermes["hermes<br/>agent, swarm, maintainer"]
+                ov["openviking<br/>agent memory"]
+                litellm["litellm<br/>gateway for models"]
+                ollama["ollama<br/>inference (GPU)"]
+                flux["flux-system<br/>GitOps from this repo"]
+            end
+            squid["egress-proxy<br/>(Squid)"]
+        end
+    end
+    ext["External, outbound only<br/>github.com, api.github.com,<br/>api.anthropic.com, discord.com"]
+
+    ingress --> webui
+    ingress --> mon
+    webui --> litellm
+    hermes --> litellm
+    hermes --> ov
+    ov --> litellm
+    litellm --> ollama
+    hermes --> squid
+    squid --> ext
+    flux -. applies manifests to .-> ns
 ```
 
 ---

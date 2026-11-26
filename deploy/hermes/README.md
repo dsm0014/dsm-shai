@@ -215,6 +215,26 @@ Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps
 
 ## Repo maintainer (spec 16)
 
+### The loop at a glance
+
+```mermaid
+flowchart LR
+    tl[".specter/tasklist.md<br/>[swarm] items"] --> pick["pick_task<br/>first eligible item"]
+    pick --> work["repo-work<br/>planner and workers edit files,<br/>make test, open a PR"]
+    work --> pr["swarm/ PR<br/>with an Evidence block"]
+    work -. follow-up tasks .-> tl
+    pr --> gates["maintainer gates<br/>diff, paths, fresh-clone tests"]
+    gates --> rev["Haiku review<br/>sees the maintainer's own test run"]
+    rev -->|merge| main["merged to main"]
+    rev -->|close| why["closed with a reason"]
+    why --> limit{"attempts at<br/>max_attempts?"}
+    limit -->|no| log["close comment becomes the<br/>decision log for the next attempt"]
+    log --> pick
+    limit -->|yes| demote["maintainer PR marks the task<br/>needs-owner, merged by the maintainer"]
+    demote --> tl
+    main --> tl
+```
+
 A Hermes job that does what the manual loop did: review the open swarm pull requests, merge the good ones, then start the next repo-work task. Job: `deploy/hermes/jobs/repo-maintainer/` (`maintain.py`, `repos.yaml`, `prompts/review.v1.txt`); it imports the swarm engine from `/opt/jobs/swarm`. **It never lets a model decide alone:** a merge needs every script gate **and** a `merge` verdict from Haiku.
 
 **Configure the repositories:** `deploy/hermes/jobs/repo-maintainer/repos.yaml` has one section per repository (`mode`, `tasklist_path`, `branch_prefix`, `reviewer`, `max_merges_per_run` (default 1), `max_merges_per_day` (default 100; `MAINT_MAX_MERGES_PER_DAY` and `MAINT_MAX_MERGES_PER_RUN` in ConfigMap `maintainer-env` set the default for every repository), `max_attempts`, `merge_deploy`, `auto_queue`); `MAINT_REPOS` (comma list) adds repositories with the defaults. A repository runs only if it is in **both** `MAINT_ALLOWED_REPOS` (ConfigMap `maintainer-env`) and `SWARM_ALLOWED_REPOS` (`swarm-env`); an unset list means nothing runs, and `MAINT_MODE=off` stops everything. To add a repository: a reviewed PR that adds it to `repos.yaml` and both allowlists.
