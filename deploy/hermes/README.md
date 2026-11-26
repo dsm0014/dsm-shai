@@ -259,6 +259,19 @@ The swarm can work through the target repo's task list and open pull requests. *
 
 **Run:** `make swarm-plan TASK=repo-work` (dry run: the picked task, derived `allowed_paths` and a scripted plan; no worker call, clone, push or PR), `make swarm-run TASK=repo-work`, `make swarm-status`. Register the cron entry paused with `register-cron.sh repo-work --apply`.
 
+### Why repo-work runs failed (audit, 2026-11-19 to 2026-11-26)
+
+The digest said only `step s1 failed its verifier` for 26 runs. The audit log keeps each step's reasons (never the model's text), and they were not one problem:
+
+| Cause | Count | Status |
+|---|---|---|
+| `haiku wrapper exit 124` (the wrapper's 120 s timeout) | 38 timeouts in 23 runs, all on 2026-11-20 and 11-21 | Not reproduced. Every task on those two days edited `docs/architecture.md`, so the file looks like the cause but is not: a whole-file rewrite of the 14 KB version through the wrapper takes 16 s now. It was transient (Haiku or API latency) and has not recurred. |
+| `keeps_size`: the worker returned under 70% of the file | 11 | The guard working as designed: the step is retried, then escalated. |
+| `cites_inputs`: the output does not mention its input path | 3 | A bug, fixed. That verifier suits a summary, and a file-writing step returns a whole file that need not name itself, so it is no longer applied when `file_block` is in the step's verifiers. |
+| `file_block`: no fenced file block | 4 steps in 2 runs (11-25, 11-26) | The worker answered without a fenced block. A guard now rejects a JSON object returned in place of a file (PR 187). Whether every case was that is not established. |
+
+Failures that ended in `tests failed (exit 2)` (11) had their own causes: a bash body written into a `.py` file, and checks that read the task's own text as a violation. The message now carries the last lines of the test output, and a failed step's message now carries its last verifier reason, so the digest says what failed.
+
 ## Claude Haiku through the Claude Code CLI (spec 12)
 
 Haiku runs on your Claude subscription, not the API. No API key exists anywhere; `claude-haiku.sh` unsets `ANTHROPIC_API_KEY` before each call and `make claude-haiku-preflight` fails if one is set.

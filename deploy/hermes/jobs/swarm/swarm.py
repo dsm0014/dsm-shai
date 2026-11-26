@@ -296,7 +296,11 @@ class Run:
     def run_step(self, step, items):
         stat = {"id": step["id"], "tag": step["tag"], "attempts": 0, "tiers": [], "verifier": "", "fails": [], "ok": False}
         local_failures, prev = 0, None
-        names = list(self.task.get("verifiers") or []) + (["cites_inputs"] if step.get("inputs") else [])
+        names = list(self.task.get("verifiers") or [])
+        # cites_inputs suits a summary, which must name what it summarises. A file-writing step (file_block) returns the whole new file,
+        # which need not mention its own path, and the check failed it for that (3 repo-work runs).
+        if step.get("inputs") and "file_block" not in names:
+            names.append("cites_inputs")
         ctx = {"input_ids": (step.get("inputs") or []), "min_chars": self.task.get("min_chars", 40),
                "allowed_paths": self.task.get("allowed_paths", []), "max_chars": self.task.get("max_chars", 8000),
                "orig_len": step.get("orig_len"), "orig_text": step.get("orig_text"), "allow_heading_change": step.get("allow_heading_change"), "min_keep_pct": step.get("min_keep_pct", 70)}
@@ -336,7 +340,8 @@ class Run:
                 local_failures += 1
         with self.lock:
             self.steps.append(stat)
-        raise Failed("step %s failed its verifier" % step["id"])
+        # the last reason (never the model's text) goes in the message: the digest said only "failed its verifier" for 26 repo-work runs
+        raise Failed("step %s failed its verifier: %s" % (step["id"], (stat["fails"][-1] if stat["fails"] else "no reason recorded")[:120]))
 
     def execute(self, plan, items):
         pending = {s["id"]: s for s in plan["steps"]}
