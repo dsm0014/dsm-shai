@@ -233,6 +233,36 @@ class FollowupsInTheTaskListGate(unittest.TestCase):
         self.assertTrue(problems)
 
 
+MENTIONS = ("- [ ] [swarm] **CI check, task list lint:** create `scripts/check-task-list.py`. It checks only lines that start with "
+            "- [ ] [swarm] or - [ ] [swarm-deploy] and ignores the rest.")
+
+
+class DemoteLine(unittest.TestCase):
+    """The demotion changes the tag at the start of the item and nothing else. The old transform replaced the first marker anywhere,
+    so a task that mentions the markers in its description (the lint task) had that text rewritten instead."""
+
+    def test_only_the_leading_tag_changes(self):
+        out = maint.demote_line(MENTIONS)
+        self.assertTrue(out.startswith("- [ ] [needs-owner] **CI check, task list lint:**"))
+        self.assertIn("- [ ] [swarm] or - [ ] [swarm-deploy] and ignores the rest.", out)
+
+    def test_a_swarm_deploy_tag_is_demoted(self):
+        self.assertEqual(maint.demote_line("- [ ] [swarm-deploy] **x:** `a.yaml`"), "- [ ] [needs-owner] **x:** `a.yaml`")
+
+    def test_a_line_that_is_already_owner_only_is_unchanged(self):
+        line = "- [ ] [needs-owner] **x:** `a.md`"
+        self.assertEqual(maint.demote_line(line), line)
+
+    def test_the_gate_refuses_the_old_transforms_rewrite_of_a_description(self):
+        corrupted = MENTIONS.replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1)
+        with mock.patch.object(maint, "api", pr_files(f(TL, (MENTIONS, corrupted)))):
+            self.assertFalse(maint.demotion_only(REPO, 7, TL))
+
+    def test_the_gate_accepts_the_corrected_demotion(self):
+        with mock.patch.object(maint, "api", pr_files(f(TL, (MENTIONS, maint.demote_line(MENTIONS))))):
+            self.assertTrue(maint.demotion_only(REPO, 7, TL))
+
+
 class MergeDemotions(unittest.TestCase):
     def setUp(self):
         self.state = tempfile.mkdtemp(prefix="demote-")
