@@ -48,6 +48,20 @@ After the merge Flux created the namespace and the pod (Ready). From the hermes 
 6. `kubectl -n egress-proxy logs deploy/squid` shows the allowed and denied requests.
 7. Mesh enrolment: if step 2 fails with a refused HBONE connection, delete the squid pod (see "Restart recovery" in `deploy/istio/README.md`).
 
-## Port 3129 and the Discord hosts: not yet verified (2026-11-18)
+## Both listeners and the Discord hosts: verified in the cluster (2026-11-26)
 
-Written and reviewed, not run. `squid -k parse` and the allow and deny checks for both listeners still have to run (Docker was unresponsive when this was written), then the in-cluster checks above repeated for `:3129`: allowed `https://example.com`, denied a 10.x address, denied from another namespace. Spec 15 lists them as acceptance criteria. For Discord, watch the Squid log on first connect: the gateway may use a host under `.discord.gg` other than `gateway.discord.gg`.
+`squid -k parse` in the running Squid pod accepts `squid.conf` (one warning, `HTTP requires the use of Via`, from `via off`). The pod is the restricted environment (uid 13, read-only root), so this replaces the Docker check; Docker was not used. Probes from the hermes pod, each through `-x http://squid.egress-proxy.svc:<port>` with `--noproxy ''` (the pod's `NO_PROXY` covers `10.43.0.0/16`, so without it curl skips the proxy for cluster addresses and the test proves nothing):
+
+| Listener | Target | Result |
+|---|---|---|
+| `:3128` | `api.github.com`, `api.anthropic.com`, `discord.com`, `gateway.discord.gg`, `gateway-us-east1-b.discord.gg` | Tunnel opens (the origin answers 200 or 404) |
+| `:3128` | `cdn.discordapp.com`, `media.discordapp.net` | Tunnel opens (Discord's server answers 403 to a bare request, with no proxy error) |
+| `:3128` | `example.com`, `pypi.org`, `discordapp.com`, `api.github.com:8443`, plain `http://github.com` | Refused by the proxy (403) |
+| `:3129` | `example.com`, `pypi.org` | Tunnel opens |
+| `:3129` | `example.com:8443`, plain `http://example.com` | Refused (403) |
+| both | `10.43.0.1`, `169.254.169.254`, `127.0.0.1`, `192.168.1.1` | Refused (403) |
+| `:3129` | `kubernetes.default.svc.cluster.local` and `localtest.me` (names that resolve to a private address) | Refused (403) |
+
+No bypass: `curl --noproxy '*' https://api.github.com` from the hermes pod fails at once (broken pipe), not with a timeout. Other callers: from the `litellm` pod both ports fail with a connection reset, and ztunnel logs `401 Unauthorized` for that caller (the `squid-from-hermes` policy). The Squid log shows `TCP_DENIED/403` for each refusal and `TCP_TUNNEL/200` for `example.com:443` and `pypi.org:443`, which only the research listener allows.
+
+For Discord, watch the Squid log on first connect: the gateway may use a host under `.discord.gg` other than the two probed here.
