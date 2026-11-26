@@ -8,7 +8,6 @@ Markers: `[swarm]` = queued for the Hermes swarm (small, one named file; the rep
 
 Ordered by what the Hermes state database shows going wrong or being asked for. Work top to bottom.
 
-- [ ] [needs-owner] **Hermes terminal-tool reliability (S):** several recent Hermes sessions restate "use only your terminal tool, not web search" to get a `curl` run. Settle the `make hermes-task` example (the existing item in section 6) and add the fix to `deploy/hermes/README.md`.
 
 ## S. Swarm queue (small tasks the swarm does, one file each)
 
@@ -77,7 +76,6 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 
 ## 6. Housekeeping
 
-- [ ] [needs-owner] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
 - [ ] [needs-owner] Trim `docs/architecture.md` to a real one-pager (the diagram is fixed and the host RAM row already says WSL exposes about 15 GB by default): it is 278 lines, so deciding what to cut is yours.
 - [ ] [needs-owner] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 

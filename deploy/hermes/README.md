@@ -178,6 +178,22 @@ kubectl -n hermes exec deploy/hermes -- sh -c 'hermes -z "..."'                 
 kubectl -n hermes exec deploy/hermes -- sh -c 'hermes logs | grep tool'          # tool activity
 ```
 
+### One-off tasks: `make hermes-task`
+
+```sh
+make hermes-task TASK='Use only your terminal tool. Run this exact command in /workspace: curl -s "https://api.github.com/repos/dsm0014/dsm-shai/pulls?state=closed&per_page=1" | head -c 300 . Reply with the number of the pull request in the output and nothing else.'
+```
+
+The 9B model needs three things spelled out: the tool (`Use only your terminal tool`), the exact command with its working directory (`/workspace`, the terminal's cwd), and what to reply with. Measured on 2026-11-26 with `qwen3.5:9b`:
+
+| Phrasing | Result |
+|---|---|
+| The form above | Correct 3 of 3 |
+| The same question without the tool and command ("List the most recent closed pull request of dsm0014/dsm-shai on GitHub and tell me its number") | Did not finish within 150 s, 3 of 3 |
+| A bare question about one URL ("What does https://api.github.com/zen return right now?") | Answered, 1 of 1. Do not rely on it. |
+
+**GitHub from a task.** Reads of public data work through the Squid proxy with no token. The container has `GITHUB_TOKEN`, but the terminal tool's environment does not (checked with a presence test, never printing the value), so a task cannot open a pull request or call an authenticated endpoint. Pull requests come from the swarm and the maintainer, not from `make hermes-task`.
+
 ## Swarm orchestration (spec 13)
 
 Haiku plans and merges, local `qwen3.5:9b` (alias `chat`) does the bounded steps, and scripts own routing, caps and verification. Engine: `deploy/hermes/jobs/swarm/` (mounted at `/opt/jobs/swarm`); example job `swarm-example` (daily repo digest); template `swarm-template`. State: `/opt/data/swarm/` (`audit.jsonl`, `digest.log`, `metrics.prom`, `runs/<id>/`, `locks/`).
