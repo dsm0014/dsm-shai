@@ -34,8 +34,9 @@ Covered: GPU memory, utilization, temperature, power, and the loaded-model VRAM 
 
 - **GPU and Ollama:** VRAM used against total, utilization, temperature, power, loaded-model VRAM, LiteLLM requests per model.
 - **Workloads and node:** pod memory and CPU for `ollama`, `openviking`, `hermes`, `open-webui`; node memory against the 24 GiB WSL cap; OOM kills; memory available %.
+- **Service mesh (`dsm-mesh`):** ztunnel TCP connections and bytes by destination namespace, istiod up, proxies connected to istiod, istiod xDS pushes per second by type, and for the ingress gateway: up, its xDS link to istiod, memory, and requests per second by response code. Three monitors in `deploy/istio/metrics/metrics.yaml` feed it: a ServiceMonitor for istiod (`:15014`), a PodMonitor for ztunnel (`:15020`) and a PodMonitor for the ingress gateway (Envoy, `:15090`). All three targets are up (verified 2026-11-26). The gateway's request-rate panel stays empty until HTTP traffic passes, because Envoy emits `istio_requests_total` only after the first request.
 
-Loaded by the Grafana dashboard sidecar (label `grafana_dashboard: "1"`), with no manual import. Verified: the sidecar wrote both files and Grafana reloaded (200).
+Loaded by the Grafana dashboard sidecar (label `grafana_dashboard: "1"`), with no manual import. Verified: the sidecar wrote both files and Grafana reloaded (200). Every dashboard ConfigMap carries one file name (`mesh.json`, for example): the sidecar writes `/tmp/dashboards/<key>`, so a second ConfigMap with the same key, such as a leftover from a manual `kubectl apply`, shares that file and the same dashboard uid. Deleting the leftover removes the file for both. Annotate the managed ConfigMap afterwards to make the sidecar write it again (this happened on 2026-11-26 with a stale v1 of the mesh dashboard).
 
 ## Alert rules (`extras/alerts.yaml`)
 

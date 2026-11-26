@@ -56,7 +56,6 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 
 ## 3. Real work I can do without you
 
-- [ ] [needs-owner] **Mesh metrics and dashboard (M; closes the open item in specs 06 and 08):** scrape istiod, ztunnel and the ingress gateway with a ServiceMonitor or PodMonitor in `deploy/monitoring/`, provision an Istio dashboard in Grafana, check the series in Prometheus, record it in `deploy/monitoring/README.md` and `deploy/istio/README.md`.
 - [ ] [needs-owner] **Alert fire tests (S to M; spec 06):** VRAM above a lowered threshold, a crash-looping test pod, PVC fill. Tick the criterion only if all three fire.
 - [ ] [needs-owner] **Virtual keys survive a Postgres restore (S; spec 09):** run it as part of the spec 07 restore drill (section 4), then tick the spec 09 criterion.
 

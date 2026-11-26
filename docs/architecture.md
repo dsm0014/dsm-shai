@@ -248,9 +248,9 @@ Chat and VLM swap to stay within the 15 GB hard limit.
 | 03 OpenViking Context            | PARTIAL   | MCP client check pending                   |
 | 04 Hermes Agent                  | PARTIAL   | Browser and LLM MCP out of scope (decided); acceptance boxes to tick |
 | 05 Web UI Ingress                | PARTIAL   | Windows/LAN reachability checks            |
-| 06 Observability                 | PARTIAL   | Mesh metrics; LAN checks                   |
+| 06 Observability                 | PARTIAL   | LAN checks                                 |
 | 07 Secrets Management            | PARTIAL   | Live/fresh-cluster restore; prune          |
-| 08 Istio Service Mesh            | PARTIAL   | Mesh metrics and Grafana dashboard (egress is the Squid proxy) |
+| 08 Istio Service Mesh            | PARTIAL   | Acceptance boxes to tick (egress is the Squid proxy) |
 | 09 LiteLLM Gateway               | PARTIAL   | MCP registration, consumer integrations    |
 | 10 GitOps with Flux              | IN PROGRESS | Secret scan; suspend/resume tests         |
 | 11 Nightly Specter Improvement   | PARTIAL   | Built/merged; cron entry; go-live          |
