@@ -94,6 +94,30 @@ def extract_block(text):
     return body + "\n"
 
 
+def _tail(text, n=12):
+    lines = [l for l in (text or "").splitlines() if l.strip()]
+    return "\n".join(lines[-n:])
+
+
+def evidence(workdir, files, cmd, result):
+    """What the engine ran in the clone before it pushed, with exit codes and output, for the PR body. The maintainer reviews
+    the PR text, and a bare "passed" gave it nothing to check: it closed attempt after attempt for lacking a run. A new check
+    script (scripts/check-*.py or .sh) is also run on its own, from the repository root. Redacted and bounded."""
+    parts = []
+    if cmd and result is not None:
+        parts.append("$ %s\n[exit %d]\n%s" % (cmd, result.returncode, _tail(result.stdout + result.stderr)))
+    for f in files:
+        if not re.match(r"^scripts/check-[^/]+\.(py|sh)$", f) or not os.path.exists(os.path.join(workdir, f)):
+            continue
+        argv = ["python3", "-I", f] if f.endswith(".py") else ["bash", f]
+        try:
+            r = subprocess.run(argv, cwd=workdir, capture_output=True, text=True, timeout=120)
+            parts.append("$ %s\n[exit %d]\n%s" % (" ".join(argv), r.returncode, _tail(r.stdout + r.stderr, 10)))
+        except subprocess.TimeoutExpired:
+            parts.append("$ %s\n[timed out after 120 s]" % " ".join(argv))
+    return lib.redact("\n\n".join(parts))[:3000]
+
+
 MAX_FOLLOWUPS = 2     # new [swarm] lines one run may add to the task list
 MAX_QUEUED = 20       # the queue is never longer than this, so follow-ups cannot grow without bound
 FOLLOWUP_LINE = re.compile(r"^- \[ \] \[swarm\] \*\*[^*\n]{3,80}:\*\* .{20,}$")
@@ -287,16 +311,20 @@ def main(task, run, swarm, lockf, state_name):
         cmd = os.environ.get("SWARM_TEST_CMD") or ("make test" if re.search(r"^test:", open(os.path.join(workdir, "Makefile")).read(), re.M) else "")
         if os.path.exists(os.path.join(workdir, "scripts/check-sops.sh")):
             cmd = (cmd + " && " if cmd else "") + "bash scripts/check-sops.sh"
+        t = None
         if cmd:
             t = subprocess.run(["bash", "-c", cmd], cwd=workdir, capture_output=True, text=True, timeout=envint("SWARM_TEST_TIMEOUT", 1200))
             if t.returncode != 0:
                 raise swarm.Failed("tests failed (exit %d)" % t.returncode)
+        proof = evidence(workdir, info["files"], cmd, t)  # run before the commit, in the same clone the branch is pushed from
         git("add", "-A", cwd=workdir)
         git("commit", "-q", "-m", "swarm: " + re.sub(r"\[[^\]]*\]\s*", "", info["text"])[:70], "-m", "Run %s. Opened by the Hermes swarm; review before merging." % run.id, cwd=workdir)
         git("push", "-q", "origin", branch, cwd=workdir)
         body = ("Task: %s\n\nFiles: %s\nRun: %s. Haiku calls: %d, local calls: %d. Verifiers: file block, allowed paths, caps, `%s` passed.\n"
                 "Opened by the swarm. It never merges; review and merge it yourself." % (info["text"], ", ".join("`%s`" % f for f in info["files"]), run.id,
                                                                                       run.calls["haiku"], run.calls["chat"], cmd or "no tests"))
+        if proof:
+            body += "\n\nEvidence, run by the engine in a clone of this branch before the PR was opened (commands, exit codes, output):\n```\n" + proof + "\n```"
         if queued_followups:
             body += "\n\nFollow-up tasks this change queues (task-list lines added, each checked for format and paths):\n" + "\n".join("- %s" % l for l in queued_followups)
         pr = api("POST", "/repos/%s/pulls" % repo, {"title": "swarm: " + re.sub(r"\[[^\]]*\]\s*|`", "", info["text"])[:70], "head": branch, "base": default, "body": body})
