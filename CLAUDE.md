@@ -26,3 +26,4 @@
 - Specs are authored with `/new-spec` (claude-specter) and implemented with `/do-spec`.
 - The task list (`.specter/tasklist.md`) holds only work still to do. When a task list is completed, archive it to `.specter/archive/` as a dated decision log and start the next list from the remaining work only. The new list does not repeat, summarise or link earlier lists; history lives in the archive.
 - Kubernetes manifests are Helm/Kustomize under `deploy/`; scripts under `scripts/`.
+- Diagrams in docs are mermaid blocks (` ```mermaid `), where a diagram helps at all. Do not draw boxes in ASCII and do not rely on hand-aligned spacing. A plain file tree is fine as a text block.
