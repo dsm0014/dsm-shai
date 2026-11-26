@@ -141,5 +141,34 @@ class FormerGap(unittest.TestCase):
         self.assertIsNone(task)
 
 
+class SkipsIneligibleToTheNextTask(unittest.TestCase):
+    """An ineligible line is skipped and the picker goes on to the next proper swarm task."""
+
+    def test_a_description_that_mentions_needs_owner_is_eligible(self):
+        md = _list("- [ ] [swarm] **CI check, task list lint:** create `scripts/check-task-list.py`. Refuse a line that contains [needs-owner].")
+        task, skipped = pick_task.pick(md)
+        self.assertIsNotNone(task)
+        self.assertEqual(skipped, [])
+
+    def test_owner_tag_before_the_title_still_skips(self):
+        md = _list("- [ ] [swarm] [needs-owner] **Decide:** change `docs/a.md`")
+        task, skipped = pick_task.pick(md)
+        self.assertIsNone(task)
+        self.assertEqual(skipped, [(1, "needs-owner")])
+
+    def test_skips_an_owner_item_and_picks_the_next_proper_one(self):
+        md = _list("- [ ] [swarm] [needs-owner] **Decide:** change `docs/a.md`",
+                   "- [ ] [swarm] **Fix intro:** rewrite `docs/b.md`.")
+        task, skipped = pick_task.pick(md)
+        self.assertEqual(task["line"], 2)
+        self.assertEqual(skipped, [(1, "needs-owner")])
+
+    def test_skips_a_finished_item_and_picks_the_next_proper_one(self):
+        md = _list("- [x] [swarm] **Done:** change `docs/a.md`", "- [ ] [swarm] **Next:** rewrite `docs/b.md`.")
+        task, skipped = pick_task.pick(md)
+        self.assertEqual(task["line"], 2)
+        self.assertEqual(skipped, [(1, "not unstarted")])
+
+
 if __name__ == "__main__":
     unittest.main()
