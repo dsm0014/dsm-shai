@@ -137,6 +137,44 @@ class DemotionOnly(unittest.TestCase):
         self.assertFalse(self.check(f(TL, ("- [ ] Plain item.", "- [ ] [needs-owner] Plain item."))))
 
 
+PLAIN = "- [ ] **CI check, makefile help:** create the new file `scripts/check-makefile-help.py`."
+
+
+class QueueOnly(unittest.TestCase):
+    def check(self, line_old, line_new, existing=("scripts/check-makefile-help.py",), files=None):
+        def api(method, path, body=None, raw=False):
+            if "/contents/" in path:
+                target = path.split("/contents/")[1].split("?")[0]
+                if target in existing:
+                    return {}
+                raise OSError("404 %s" % target)
+            return files_resp
+        files_resp = [f(TL, (line_old, line_new))] if files is None else files
+        with mock.patch.object(maint, "api", api):
+            return maint.queue_only(REPO, 9, TL, "main")
+
+    def test_adds_the_marker_to_an_existing_file_task(self):
+        self.assertTrue(self.check(PLAIN, PLAIN.replace("- [ ] ", "- [ ] [swarm] ", 1)))
+
+    def test_missing_file_is_refused(self):
+        self.assertFalse(self.check(PLAIN, PLAIN.replace("- [ ] ", "- [ ] [swarm] ", 1), existing=()))
+
+    def test_forbidden_path_is_refused(self):
+        bad = PLAIN.replace("scripts/check-makefile-help.py", ".github/workflows/ci.yml")
+        self.assertFalse(self.check(bad, bad.replace("- [ ] ", "- [ ] [swarm] ", 1), existing=(".github/workflows/ci.yml",)))
+
+    def test_deploy_class_path_is_refused(self):
+        bad = PLAIN.replace("scripts/check-makefile-help.py", "deploy/istio/egress/proxy.yaml")
+        self.assertFalse(self.check(bad, bad.replace("- [ ] ", "- [ ] [swarm] ", 1), existing=("deploy/istio/egress/proxy.yaml",)))
+
+    def test_more_than_three_files_is_refused(self):
+        many = PLAIN.replace("`scripts/check-makefile-help.py`", "`a.py` `b.py` `c.py` `d.py`")
+        self.assertFalse(self.check(many, many.replace("- [ ] ", "- [ ] [swarm] ", 1), existing=("a.py", "b.py", "c.py", "d.py")))
+
+    def test_other_text_changed_is_refused(self):
+        self.assertFalse(self.check(PLAIN, PLAIN.replace("- [ ] ", "- [ ] [swarm] ", 1).replace("makefile", "make")))
+
+
 class MergeDemotions(unittest.TestCase):
     def setUp(self):
         self.state = tempfile.mkdtemp(prefix="demote-")
