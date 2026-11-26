@@ -50,7 +50,6 @@ Spec 13 is DONE (live-verified; the `swarm-example` cron entry is registered pau
 
 Egress (two Squid listeners) and the wrapper's research mode are written and tested offline. Do these in order.
 
-- [ ] [needs-owner] **Live research check (S):** `CLAUDE_HAIKU_WEB=1 claude-haiku.sh` in the pod; confirm `WebSearch` works on the subscription token, the tool list is exactly the two tools, and the Squid log shows `:3129`.
 - [ ] [needs-owner] **Needs you (S):** create the Discord application and bot (Message Content Intent on, Server Members Intent off), invite it to a private server, give me the token, your user ID and the channel ID through `sops`; I never see them in plaintext in the repo.
 - [ ] [needs-owner] **`quick_commands` test (S):** on a throwaway command, find out whether the LLM is bypassed, how arguments and stdout and the exit code behave, the timeout and working directory, and whether a non-admin is blocked.
 - [ ] [needs-owner] **Build with `/do-spec` (L):** the `hermes-discord` secret, gateway config (`discord_admin` off, allowlists), `swarm-chat.sh` with offline tests, the digest cron script copied into `HERMES_HOME/scripts`, README, then the live criteria.
