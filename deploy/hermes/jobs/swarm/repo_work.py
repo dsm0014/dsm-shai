@@ -94,6 +94,32 @@ def extract_block(text):
     return body + "\n"
 
 
+MAX_FOLLOWUPS = 2     # new [swarm] lines one run may add to the task list
+MAX_QUEUED = 20       # the queue is never longer than this, so follow-ups cannot grow without bound
+FOLLOWUP_LINE = re.compile(r"^- \[ \] \[swarm\] \*\*[^*\n]{3,80}:\*\* .{20,}$")
+
+
+def followup_paths(line):
+    return re.findall(r"`([^`]+)`", line)
+
+
+def followup_problem(line):
+    """Why a proposed follow-up task line may not be queued ('' when it may): the swarm's own format, 1 to 3 paths the swarm
+    may edit. Existence of the paths is checked where the repository is at hand (the engine and the maintainer)."""
+    line = line.strip()
+    if not FOLLOWUP_LINE.match(line):
+        return "not a [swarm] task line in the queue format"
+    if "[swarm-deploy]" in line or "[needs-owner]" in line:
+        return "marked deploy or owner-only"
+    paths = followup_paths(line)
+    if not 1 <= len(paths) <= 3:
+        return "must name 1 to 3 files"
+    for p in paths:
+        if forbidden(p) or deploy_class(p):
+            return "names a forbidden or deploy-class path: %s" % p
+    return ""
+
+
 def check_plan(plan, files):
     """One step edits exactly one allowed file, no file twice."""
     seen = []
@@ -128,6 +154,7 @@ def main(task, run, swarm, lockf, state_name):
     status, reason, pr_url, info, t0 = "ok", "", "", None, time.time()
     workdir = os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "swarm-repo-work-" + run.id)
     plan, results, history, remembered = {"steps": []}, [], "", False
+    queued_followups = []  # follow-up [swarm] lines this run adds to the task list, checked before they are written
     try:
         if os.environ.get("SWARM_REPO_WORK") != "1":
             raise Refused("SWARM_REPO_WORK is not 1")
@@ -180,7 +207,11 @@ def main(task, run, swarm, lockf, state_name):
             items.append({"id": f, "text": text})
         # plan with the orchestrator, then run the steps under the swarm's caps
         history = swarm.recall(" ".join(info["files"]))  # earlier outcomes for these files: memory, untrusted, bounded
-        run.task["goal"] = "Complete this repository task by editing the listed files, one step per file: " + info["text"]
+        run.task["goal"] = ("Complete this repository task by editing the listed files, one step per file: " + info["text"]
+                            + ". Also return a JSON key \"followups\": up to %d new task-list lines, each in this exact form: "
+                            "- [ ] [swarm] **Short title:** what to change, with 1 to 3 existing files in backticks. Include a check that proves it. "
+                            "Only for follow-up work this change makes necessary and a worker can do with those files; use [] when there is none."
+                            % MAX_FOLLOWUPS)
         run.task["verifiers"] = ["file_block", "keeps_size"]
         tier = "chat" if run.orch == "chat" else "haiku"
         problems = []
@@ -223,7 +254,22 @@ def main(task, run, swarm, lockf, state_name):
         if os.path.exists(tl):
             lines = open(tl).read().split("\n")
             if info["line"] - 1 < len(lines) and lines[info["line"] - 1].lstrip().startswith("- [ ]"):
+                # follow-up tasks the plan asked for take the finished task's place: each one is checked, and skipped with a digest line if not
+                queued = sum(1 for l in lines if l.startswith("- [ ] [swarm]"))
+                for line in (plan.get("followups") or [])[:MAX_FOLLOWUPS]:
+                    line = str(line).strip()
+                    why = followup_problem(line)
+                    if not why and not all(os.path.exists(os.path.join(workdir, p)) for p in followup_paths(line)):
+                        why = "names a file that does not exist"
+                    if not why and queued >= MAX_QUEUED:
+                        why = "queue is full (%d)" % MAX_QUEUED
+                    if why:
+                        lib.digest("repo-work: follow-up not queued (%s): %s" % (why, line[:120]))
+                        continue
+                    queued_followups.append(line)
+                    queued += 1
                 del lines[info["line"] - 1]
+                lines[info["line"] - 1:info["line"] - 1] = queued_followups
                 open(tl, "w").write("\n".join(lines))
         # script-only verification
         changed = [l.split("\t")[-1] for l in git("diff", "--numstat", cwd=workdir).splitlines()] + git("ls-files", "--others", "--exclude-standard", cwd=workdir).split()
@@ -251,6 +297,8 @@ def main(task, run, swarm, lockf, state_name):
         body = ("Task: %s\n\nFiles: %s\nRun: %s. Haiku calls: %d, local calls: %d. Verifiers: file block, allowed paths, caps, `%s` passed.\n"
                 "Opened by the swarm. It never merges; review and merge it yourself." % (info["text"], ", ".join("`%s`" % f for f in info["files"]), run.id,
                                                                                       run.calls["haiku"], run.calls["chat"], cmd or "no tests"))
+        if queued_followups:
+            body += "\n\nFollow-up tasks this change queues (task-list lines added, each checked for format and paths):\n" + "\n".join("- %s" % l for l in queued_followups)
         pr = api("POST", "/repos/%s/pulls" % repo, {"title": "swarm: " + re.sub(r"\[[^\]]*\]\s*|`", "", info["text"])[:70], "head": branch, "base": default, "body": body})
         pr_url = pr.get("html_url", "")
         try:
