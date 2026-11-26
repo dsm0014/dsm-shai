@@ -8,7 +8,6 @@ Markers: `[swarm]` = queued for the Hermes swarm (small, one named file; the rep
 
 Ordered by what the Hermes state database shows going wrong or being asked for. Work top to bottom.
 
-- [ ] [needs-owner] **Swarm repo-work verifier failures (S to M):** `digest.log` shows 24 `repo-work failed: step s1 failed its verifier` (17 on 2026-11-20, 6 on 2026-11-21) and one `arch-diagram` failure. Read the verifier output under `/opt/data/swarm/runs/` for those runs, find the cause, record it in `deploy/hermes/README.md`, and fix the verifier or the task format. Do this before the next unattended run.
 - [ ] [needs-owner] **Hermes terminal-tool reliability (S):** several recent Hermes sessions restate "use only your terminal tool, not web search" to get a `curl` run. Settle the `make hermes-task` example (the existing item in section 6) and add the fix to `deploy/hermes/README.md`.
 
 ## S. Swarm queue (small tasks the swarm does, one file each)
