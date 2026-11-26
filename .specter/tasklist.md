@@ -15,7 +15,6 @@ Ordered by what the Hermes state database shows going wrong or being asked for. 
 
 Order matters only where a task says "after"; the swarm takes the first queued task and the maintainer merges its pull request before the next starts. Only the edited file is in backticks.
 
-- [ ] [needs-owner] **Architecture, diagram:** in `docs/architecture.md` replace the code block under the heading "Architecture Diagram (Conceptual)" with a clean, aligned ASCII box diagram with no stray characters. Top to bottom: the Windows 11 host (i7-13700KF, RTX 4080 16 GB); WSL2 on ext4 running the k3s cluster with the Istio ambient mesh; a row of namespace boxes: ollama (inference), openviking (memory), litellm (gateway), hermes (agent, swarm, maintainer), open-webui, monitoring, flux-system; the Istio ingress gateway on the left feeding open-webui and grafana (host-local only); an egress-proxy box (Squid) below hermes leading to an External box that lists GitHub, api.anthropic.com and Discord hosts. Keep the code fence and the heading and change nothing outside the code block.
 
 ## S2. CI checks (each task creates one new script; make test now runs them all)
 
@@ -80,7 +79,7 @@ Egress (two Squid listeners) and the wrapper's research mode are written and tes
 ## 6. Housekeeping
 
 - [ ] [needs-owner] Add a `make hermes-task` example to `deploy/hermes/README.md`: the 9B model needs the tool, the working directory and the GitHub REST call for the PR spelled out.
-- [ ] [needs-owner] Trim `docs/architecture.md` to a real one-pager: fix the garbled diagram and the host RAM row (WSL exposes about 15 GB by default, not 24 GB).
+- [ ] [needs-owner] Trim `docs/architecture.md` to a real one-pager (the diagram is fixed and the host RAM row already says WSL exposes about 15 GB by default): it is 278 lines, so deciding what to cut is yours.
 - [ ] [needs-owner] Decide whether to name the model instead of the alias `chat` (scored 40/40 vs 38/40 in one run of 5, and changes Hermes's system prompt; see `deploy/hermes/README.md`). Test on a real multi-step task first. Needs the LiteLLM key allowlist to permit the new name.
 
 ## 7. Proposed, not decided
