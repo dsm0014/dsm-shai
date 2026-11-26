@@ -356,23 +356,59 @@ def demotion_only(repo, n, tasklist_path):
     return add[0] == rem[0].replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1)
 
 
+def queue_only(repo, n, tasklist_path, default):
+    """True when PR n changes only the task list, and that change adds the [swarm] marker to one existing line and nothing else.
+    The line must name 1 to 3 files that exist on the default branch and that the swarm may edit (no forbidden or deploy-class
+    path). This is the maintainer's queue PR; it is merged without the owner, like the demotions."""
+    files = pull_files(repo, n)
+    if [f.get("filename") for f in files] != [tasklist_path] or files[0].get("status") != "modified":
+        return False
+    rem, add = [], []
+    for l in (files[0].get("patch") or "").splitlines():
+        if l.startswith("@@") or l.startswith("\\"):
+            continue
+        if l.startswith("-"):
+            rem.append(l[1:])
+        elif l.startswith("+"):
+            add.append(l[1:])
+    if len(rem) != 1 or len(add) != 1 or not rem[0].startswith("- [ ] ") or "[needs-owner]" in rem[0] or "[swarm" in rem[0]:
+        return False
+    if add[0] != rem[0].replace("- [ ] ", "- [ ] [swarm] ", 1):
+        return False
+    paths = re.findall(r"`([^`]+)`", rem[0])
+    if not 1 <= len(paths) <= 3 or any(not ("/" in p or "." in p.rsplit("/", 1)[-1]) for p in paths):
+        return False
+    for p in paths:
+        if repo_work.forbidden(p) or repo_work.deploy_class(p):
+            return False
+        try:
+            api("GET", "/repos/%s/contents/%s?ref=%s" % (repo, p, default))
+        except Exception:  # missing on the default branch: the task cannot be done as written
+            return False
+    return True
+
+
 def merge_demotions(settings, report):
-    """Merge the maintainer's own [needs-owner] escalation PRs when they pass demotion_only, so the queue of tasks that need an
-    owner keeps moving. Counts against max_merges_per_run. Anything else is left for the owner."""
+    """Merge the maintainer's own PRs when they pass their gate: a [needs-owner] demotion (demotion_only), or a task-queue PR
+    that adds [swarm] to one existing task (queue_only). Counts against max_merges_per_run. Anything else is left for the owner."""
     repo = settings["repo"]
+    default = api("GET", "/repos/%s" % repo).get("default_branch", "main")
     for q in api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo):
         ref, title = q["head"]["ref"], q.get("title") or ""
-        if not (ref.startswith("maintainer/needs-owner-") and title.startswith("maintainer: mark a failing task")):
+        demote = ref.startswith("maintainer/needs-owner-") and title.startswith("maintainer: mark a failing task")
+        queue = ref.startswith("maintainer/queue-") and title.startswith("maintainer: queue a task for the swarm")
+        if not (demote or queue):
             continue
         if report["merged"] >= int(settings["max_merges_per_run"]):
             break
         try:
-            if not demotion_only(repo, q["number"], settings["tasklist_path"]):
+            ok = demotion_only(repo, q["number"], settings["tasklist_path"]) if demote else queue_only(repo, q["number"], settings["tasklist_path"], default)
+            if not ok:
                 continue
             sha = merge_pr(repo, q["number"], q["head"]["sha"])
             report["merged"] += 1
             audit({"event": "merge-demotion", "repo": repo, "pr": q["number"], "sha": sha})
-            digest("merged its own task-list demotion PR #%d (%s)" % (q["number"], title[:80]))
+            digest("merged its own task-list PR #%d (%s)" % (q["number"], title[:80]))
         except Exception as exc:  # a PR that changed since review, or an API error: try again on the next tick
             digest("demotion PR #%d not merged: %s" % (q["number"], str(exc)[:160]))
 
