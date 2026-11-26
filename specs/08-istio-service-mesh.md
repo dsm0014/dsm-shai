@@ -34,7 +34,7 @@ Adopt Istio (ambient mode) as the security, routing and egress-control layer of 
 - [ ] An unauthorized caller (for example, open-webui calling ollama directly) receives 403 / RBAC denied; an authorized caller (litellm) succeeds.
 - [x] The hermes pod reaches the internet only through the Squid proxy on port 3128: from the hermes pod, a request to an allowlisted hostname (the GitHub hosts, plus `api.anthropic.com` and the Discord hosts added by specs 12 and 15) succeeds and a request to any other hostname fails (verified 2026-11-17). Istio `REGISTRY_ONLY` does not block unregistered hosts in ambient mode, so the allowlist must be enforced by the proxy, not by `REGISTRY_ONLY`.
 - [ ] A streaming chat completion through the mesh (Open WebUI -> LiteLLM -> Ollama) delivers tokens incrementally, without buffering, timeout, or duplicate generation on a long response.
-- [ ] Mesh metrics appear in Prometheus and in a Grafana dashboard; Kiali is off by default and works when enabled.
+- [x] Mesh metrics appear in Prometheus and in a Grafana dashboard; Kiali is off by default and works when enabled. Verified 2026-11-26 for the metrics and the dashboard (`deploy/monitoring/README.md`, Dashboards); Kiali was checked 2026-11-16 (`deploy/istio/README.md`).
 - [ ] Hand-written NetworkPolicy rules replaced by identity-based policies are removed from specs 03/04/05; specs 05 and 06 no longer reference Traefik.
 - [ ] The rollback procedure was exercised (mTLS back to PERMISSIVE, namespace un-enrolled) and services keep working.
 - [ ] `deploy/istio/README.md` documents the mode decision, install, rollout order, rollback and the WSL2 verification result.

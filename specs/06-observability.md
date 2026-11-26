@@ -1,6 +1,6 @@
 # Spec 06 — Observability
 
-**Status:** PARTIAL (part A and part B deployed and verified: GPU and Ollama metrics, dashboards, alerts, fire tests, Prometheus persistence, Grafana through the host-local ingress; mesh dashboard and LAN checks pending; see deploy/monitoring/README.md)
+**Status:** PARTIAL (part A and part B deployed and verified: GPU and Ollama metrics, dashboards, alerts, fire tests, Prometheus persistence, Grafana through the host-local ingress; LAN checks pending; mesh metrics and dashboard verified 2026-11-26; see deploy/monitoring/README.md)
 
 ## Purpose
 Add lightweight monitoring for the k3s stack so GPU/VRAM pressure, WSL memory pressure and pod health are visible and alerting. The 16GB RTX 4080 is shared by chat, embedding and VLM models (spec 02 VRAM budget), so VRAM visibility is the top priority.
