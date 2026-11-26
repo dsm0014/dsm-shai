@@ -350,19 +350,31 @@ GIT_ID = {"GIT_AUTHOR_NAME": "Hermes maintainer", "GIT_COMMITTER_NAME": "Hermes 
 
 
 def edit_tasklist_pr(settings, line_text, transform, branch, title):
-    """Clone, change one task line with `transform`, push a `maintainer/` branch, open a labelled PR. Never merges it."""
+    """Clone, change one task line with `transform`, push a `maintainer/` branch, open a labelled PR. Never merges it.
+    Returns the PR URL, "already open" when a PR with this title is open, or "" after a failure (logged to the digest).
+    A branch name already taken on the remote (an earlier escalation that was never merged) gets a time suffix, so the
+    push cannot be refused; a refused push used to fail silently and leave the task retried forever."""
     repo = settings["repo"]
+    if any(q.get("title") == title for q in api("GET", "/repos/%s/pulls?state=open&per_page=100" % repo)):
+        return "already open"
     work = os.path.join(os.environ.get("SWARM_WORK", "/workspace"), "maint-" + branch.split("/")[-1])
     url = os.environ.get("MAINT_CLONE_URL") or "https://github.com/%s.git" % repo
     default = api("GET", "/repos/%s" % repo).get("default_branch", "main")
+    step = "clone"
     try:
         subprocess.run(["git", "clone", "--quiet", "--depth", "20", "--branch", default, url, work], capture_output=True, text=True, timeout=600, check=True)
         p = os.path.join(work, settings["tasklist_path"])
         text = open(p).read()
         if line_text not in text:
+            digest("escalation not applied: the task line is not on %s (%s)" % (default, title))
             return ""
         open(p, "w").write(text.replace(line_text, transform(line_text), 1))
+        step = "branch"
+        remote = subprocess.run(["git", "ls-remote", "--heads", "origin", branch], cwd=work, capture_output=True, text=True, timeout=120, check=True)
+        if remote.stdout.strip():
+            branch = "%s-%s" % (branch, time.strftime("%Y%m%d%H%M%S", time.gmtime()))
         for c in (["checkout", "-q", "-b", branch], ["add", "-A"], ["commit", "-q", "-m", title], ["push", "-q", "origin", branch]):
+            step = c[0]
             subprocess.run(["git"] + c, cwd=work, capture_output=True, text=True, timeout=300, check=True, env=dict(GIT_ID, **os.environ))
         pr = api("POST", "/repos/%s/pulls" % repo, {"title": title, "head": branch, "base": default, "body": "Opened by the repo maintainer. It never merges its own task-list changes."})
         try:
@@ -370,7 +382,11 @@ def edit_tasklist_pr(settings, line_text, transform, branch, title):
         except (urllib.error.URLError, OSError):
             pass
         return pr.get("html_url", "")
-    except (subprocess.SubprocessError, OSError, urllib.error.URLError):
+    except subprocess.CalledProcessError as exc:
+        digest("escalation failed at %s for %s: %s" % (step, title, (exc.stderr or "").strip()[-200:]))
+        return ""
+    except (subprocess.SubprocessError, OSError, urllib.error.URLError) as exc:
+        digest("escalation failed at %s for %s: %s" % (step, title, exc))
         return ""
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -504,8 +520,9 @@ def maintain_repo(settings, plan, counters):
             entry["remembered"] = remember_outcome(repo, n, task_text, "closed", why)
             audit({"event": "close", "repo": repo, "pr": n, "gates": entry["gates"], "remembered": entry["remembered"]})
             if task and bump_attempt(key) >= int(settings["max_attempts"]):
+                subject = re.sub(r"\[[^\]]*\]\s*|`", "", task["text"])[:50]
                 edit_tasklist_pr(settings, task["text"], lambda l: l.replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1),
-                                 "maintainer/needs-owner-" + key, "maintainer: mark a failing task [needs-owner]")
+                                 "maintainer/needs-owner-" + key, "maintainer: mark a failing task [needs-owner] (%s)" % subject)
         else:
             if comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan, kind="fix"):
                 entry["remembered"] = remember_outcome(repo, n, task_text, "needs changes", why)
