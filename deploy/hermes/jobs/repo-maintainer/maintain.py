@@ -359,6 +359,13 @@ def merge_pr(repo, n, sha):
     return res.get("sha", "")
 
 
+def demote_line(line):
+    """The task line with its leading [swarm] or [swarm-deploy] tag turned into [needs-owner]. Only the tag at the start of the item
+    changes: a task that mentions the markers in its description (the task-list lint task does) must keep that text. The old
+    transform replaced the first occurrence anywhere in the line and rewrote such a mention instead of the tag."""
+    return re.sub(r"^(\s*- \[ \] )\[swarm(?:-deploy)?\]", r"\1[needs-owner]", line, count=1)
+
+
 def demotion_only(repo, n, tasklist_path):
     """True when PR n changes only the task list, and that change is one line: a [swarm] or [swarm-deploy] item becomes
     [needs-owner] and nothing else on the line changes. The only kind of task-list PR the maintainer may merge itself."""
@@ -375,7 +382,7 @@ def demotion_only(repo, n, tasklist_path):
             add.append(l[1:])
     if len(rem) != 1 or len(add) != 1 or "[needs-owner]" in rem[0]:
         return False
-    return add[0] == rem[0].replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1)
+    return add[0] == demote_line(rem[0]) and add[0] != rem[0]
 
 
 def queue_only(repo, n, tasklist_path, default):
@@ -621,7 +628,7 @@ def maintain_repo(settings, plan, counters):
             audit({"event": "close", "repo": repo, "pr": n, "gates": entry["gates"], "remembered": entry["remembered"]})
             if task and bump_attempt(key) >= int(settings["max_attempts"]):
                 subject = re.sub(r"\[[^\]]*\]\s*|`", "", task["text"])[:50]
-                edit_tasklist_pr(settings, task["text"], lambda l: l.replace("[swarm-deploy]", "[needs-owner]", 1).replace("[swarm]", "[needs-owner]", 1),
+                edit_tasklist_pr(settings, task["text"], demote_line,
                                  "maintainer/needs-owner-" + key, "maintainer: mark a failing task [needs-owner] (%s)" % subject)
         else:
             if comment_once(repo, n, pr["head"]["sha"], "**Maintainer:** needs changes. " + why, plan, kind="fix"):

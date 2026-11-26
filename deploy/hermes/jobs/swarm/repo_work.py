@@ -189,6 +189,21 @@ def last_attempt_decision(repo, task_text):
     return None, ""
 
 
+def last_failed_run_reason(task_text):
+    """The reason the latest run for this task gave when it stopped before opening a PR (for example which check failed in
+    the engine's own tests), or "" when the latest run reached a PR or never failed. A closed PR's comment is the decision log
+    for a run that got that far (last_attempt_decision); a run that failed earlier left nothing for the next attempt to learn
+    from, so the worker repeated the same mistake. `picked` in the audit entry is the first 120 characters of the task text."""
+    key = task_text[:120]
+    for r in reversed(lib.read_audit()):
+        if r.get("kind") != "repo_work" or r.get("picked") != key:
+            continue
+        if r.get("status") == "failed" and not r.get("pr_url"):
+            return str(r.get("reason") or "")[:600]
+        return ""
+    return ""
+
+
 def main(task, run, swarm, lockf, state_name):
     """Returns the exit code. `run` is a swarm.Run; `swarm` the swarm module (passed in to avoid a circular import)."""
     repo = task["repo"]
@@ -232,6 +247,11 @@ def main(task, run, swarm, lockf, state_name):
             attempt_no, decision = last_attempt_decision(repo, info["text"])
         except Exception as exc:  # GitHub unreachable: the attempt still runs, without the history
             lib.digest("repo-work: attempt history unavailable (%s)" % exc)
+        failed_reason = ""
+        try:
+            failed_reason = last_failed_run_reason(info["text"])
+        except Exception as exc:  # an unreadable audit log must not stop the attempt
+            lib.digest("repo-work: last failure unavailable (%s)" % exc)
         # clone and branch
         default = api("GET", "/repos/%s" % repo).get("default_branch", "main")
         url = os.environ.get("SWARM_CLONE_URL") or "https://github.com/%s.git" % repo
@@ -277,6 +297,9 @@ def main(task, run, swarm, lockf, state_name):
             if decision:  # a re-attempt: the maintainer's reason for closing the last one is the decision log the new file must answer
                 s["instruction"] += ("\nThis task was attempted before in PR #%s and the maintainer closed that attempt. The new file must not repeat these defects:\n%s"
                                      % (attempt_no, workers.untrusted("maintainer's reason for closing the previous attempt", decision)))
+            if failed_reason:  # the latest attempt stopped before a PR: its failure is the lesson
+                s["instruction"] += ("\nThe latest attempt at this task failed before a pull request opened. The new file must not repeat that failure:\n%s"
+                                     % workers.untrusted("why the latest attempt failed", failed_reason))
         run.execute(plan, items)
         # apply
         for s in plan["steps"]:
