@@ -334,7 +334,8 @@ def main(task, run, swarm, lockf, state_name):
         if cmd:
             t = subprocess.run(["bash", "-c", cmd], cwd=workdir, capture_output=True, text=True, timeout=envint("SWARM_TEST_TIMEOUT", 1200))
             if t.returncode != 0:
-                raise swarm.Failed("tests failed (exit %d)" % t.returncode)
+                # the last lines of the output say which check failed and why; "exit 2" alone hid a false positive for several attempts
+                raise swarm.Failed("tests failed (exit %d): %s" % (t.returncode, lib.redact(" | ".join(_tail(t.stdout + t.stderr, 3).splitlines()))[:240]))
         proof = evidence(workdir, info["files"], cmd, t)  # run before the commit, in the same clone the branch is pushed from
         git("add", "-A", cwd=workdir)
         git("commit", "-q", "-m", "swarm: " + re.sub(r"\[[^\]]*\]\s*", "", info["text"])[:70], "-m", "Run %s. Opened by the Hermes swarm; review before merging." % run.id, cwd=workdir)

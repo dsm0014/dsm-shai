@@ -440,6 +440,18 @@ class Verifiers(RepoWorkCase):
         self.assertNothingPushed()
         self.assertNoMergeRequest()
         self.assertEqual(self.workdirs(), [])
+
+    def test_failing_tests_report_which_check_failed(self):
+        """The reason carries the last lines of the output, so the digest says which check failed and why."""
+        cmd = "echo 'scripts/check-x.py: broken link to target'; echo 'second line'; exit 2"
+        rc, out, err = self.run_repo("--run-id", "run-tests-why", SWARM_TEST_CMD=cmd)
+        self.assertEqual(rc, 1, out + err)
+        reason = self.last()["reason"]
+        self.assertIn("tests failed (exit 2)", reason)
+        self.assertIn("scripts/check-x.py: broken link to target", reason)
+        self.assertIn("second line", reason)
+        self.assertIn("broken link to target", self.env.digest())
+        self.assertNothingPushed()
         self.assertIn("repo-work failed", self.env.digest())
 
     def test_worker_without_a_file_block_fails_after_retries(self):
